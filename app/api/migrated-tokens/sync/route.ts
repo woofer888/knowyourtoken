@@ -12,6 +12,21 @@ export async function POST(request: NextRequest) {
   try {
     console.log("Starting sync of graduated tokens...")
     
+    // Get the most recent migration date from our database
+    // Only import tokens that migrated AFTER the last one we have
+    const lastMigrated = await prisma.token.findFirst({
+      where: {
+        migrated: true,
+        isPumpFun: true,
+      },
+      orderBy: {
+        migrationDate: "desc",
+      },
+      select: {
+        migrationDate: true,
+      },
+    })
+    
     // Fetch all graduated tokens from PumpFun
     const graduatedTokens = await fetchGraduatedTokens()
 
@@ -25,19 +40,32 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    let imported = 0
-    let updated = 0
-    let errors = 0
-    const errorDetails: string[] = []
-
-    // Process only the last 3 migrated tokens (most recent)
-    // Sort by creationTime descending to get newest first, then take last 3
+    // Sort by creationTime descending to get newest first
     const sortedTokens = [...graduatedTokens].sort((a, b) => {
       const timeA = a.creationTime || (a as any).createdAt || 0
       const timeB = b.creationTime || (b as any).createdAt || 0
       return timeB - timeA // Descending order (newest first)
     })
-    const tokensToProcess = sortedTokens.slice(0, 3) // Only last 3
+
+    // Filter to only NEW tokens (migrated after our last one)
+    let tokensToProcess = sortedTokens
+    if (lastMigrated?.migrationDate) {
+      const lastDate = lastMigrated.migrationDate.getTime() / 1000
+      tokensToProcess = sortedTokens.filter((token) => {
+        const tokenTime = token.creationTime || (token as any).createdAt
+        return tokenTime > lastDate
+      })
+      console.log(`Filtered to ${tokensToProcess.length} new tokens (after ${new Date(lastDate * 1000).toISOString()})`)
+    } else {
+      // If no previous migrations, only take the last 3 to avoid importing everything
+      tokensToProcess = sortedTokens.slice(0, 3)
+      console.log(`No previous migrations found, importing only last 3 tokens`)
+    }
+
+    let imported = 0
+    let updated = 0
+    let errors = 0
+    const errorDetails: string[] = []
     
     for (const token of tokensToProcess) {
       try {
