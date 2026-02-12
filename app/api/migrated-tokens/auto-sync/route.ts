@@ -119,12 +119,14 @@ export async function GET(request: NextRequest) {
         }
 
         // Check if already exists by contract address (prevent duplicates)
-        const existing = await prisma.token.findFirst({
-          where: {
-            contractAddress: mint,
-            chain: "Solana",
-          },
-        })
+        const existing = await executeQuery(() =>
+          prisma.token.findFirst({
+            where: {
+              contractAddress: mint,
+              chain: "Solana",
+            },
+          })
+        )
 
         if (existing) {
           console.log(`Skipping ${mint.substring(0, 8)}... - already exists in database`)
@@ -195,9 +197,11 @@ export async function GET(request: NextRequest) {
         }
         
         // Check if slug exists and make it unique if needed
-        const slugExists = await prisma.token.findUnique({
-          where: { slug: cleanTokenData.slug },
-        })
+        const slugExists = await executeQuery(() =>
+          prisma.token.findUnique({
+            where: { slug: cleanTokenData.slug },
+          })
+        )
         
         if (slugExists) {
           cleanTokenData.slug = `${cleanTokenData.slug}-${mint.substring(0, 8)}`
@@ -205,9 +209,11 @@ export async function GET(request: NextRequest) {
 
         // Create new token
         try {
-          await prisma.token.create({
-            data: cleanTokenData,
-          })
+          await executeQuery(() =>
+            prisma.token.create({
+              data: cleanTokenData,
+            })
+          )
           imported++
           console.log(`✓ Auto-imported: ${cleanTokenData.name} (${cleanTokenData.symbol}) - ${mint.substring(0, 8)}...`)
         } catch (createError: any) {
@@ -220,9 +226,11 @@ export async function GET(request: NextRequest) {
             // Slug conflict, try with unique slug
             cleanTokenData.slug = `token-${mint.substring(0, 16)}`
             try {
-              await prisma.token.create({
-                data: cleanTokenData,
-              })
+              await executeQuery(() =>
+                prisma.token.create({
+                  data: cleanTokenData,
+                })
+              )
               imported++
               console.log(`✓ Auto-imported with unique slug: ${cleanTokenData.name}`)
             } catch (retryError: any) {
@@ -261,8 +269,15 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error in auto-sync:", error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error("Auto-sync error details:", { errorMessage, errorStack })
     return NextResponse.json(
-      { error: "Auto-sync failed" },
+      { 
+        error: "Auto-sync failed",
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorStack : undefined
+      },
       { status: 500 }
     )
   }
