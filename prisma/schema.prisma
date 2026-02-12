@@ -1,0 +1,83 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Token {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  symbol          String
+  description     String?
+  lore            String?
+  originStory     String?
+  contractAddress String
+  chain           String   // Solana, Ethereum, BSC, etc.
+  
+  // Social links
+  twitterUrl      String?
+  telegramUrl     String?
+  websiteUrl      String?
+  
+  // Launch details
+  launchDate      DateTime?
+  launchPrice     Float?
+  
+  // Market data (placeholders for now)
+  currentPrice    Float?
+  marketCap       Float?
+  volume24h       Float?
+  
+  // Community
+  sentiment       String?  // Bullish, Bearish, Neutral, etc.
+  
+  // Media
+  logoUrl         String?
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  published       Boolean  @default(false)
+  
+  // Relations
+  events          TokenEvent[]
+  gallery         TokenMedia[]
+  
+  @@index([slug])
+  @@index([chain])
+  @@index([published])
+}
+
+model TokenEvent {
+  id          String   @id @default(cuid())
+  tokenId     String
+  token       Token    @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  date        DateTime
+  type        String   // Launch, Pump, Crash, Partnership, etc.
+  createdAt   DateTime @default(now())
+  
+  @@index([tokenId])
+  @@index([date])
+}
+
+model TokenMedia {
+  id          String   @id @default(cuid())
+  tokenId     String
+  token       Token    @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  url         String
+  type        String   // image, video, gif
+  caption     String?
+  createdAt   DateTime @default(now())
+  
+  @@index([tokenId])
+}
+
