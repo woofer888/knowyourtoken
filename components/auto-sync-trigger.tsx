@@ -19,8 +19,10 @@ export function AutoSyncTrigger() {
         
         if (data.imported > 0) {
           console.log(`Auto-sync imported ${data.imported} new tokens`)
-          // Optionally refresh the page to show new tokens
-          // window.location.reload()
+          // Refresh the page to show new tokens
+          window.location.reload()
+        } else if (data.message) {
+          console.log(`Auto-sync: ${data.message}`)
         }
         
         lastSyncRef.current = Date.now()

@@ -49,12 +49,17 @@ export async function GET(request: NextRequest) {
     
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
+      // Use a small buffer (5 seconds) to account for timing differences
+      const bufferTime = 5
       tokensToProcess = sortedTokens.filter((token) => {
-        const tokenTime = token.creationTime || (token as any).createdAt || 0
-        // Only import tokens that migrated AFTER our last one
-        return tokenTime > lastDate
+        // Try multiple fields - migration might be tracked differently
+        const tokenTime = token.creationTime || (token as any).createdAt || (token as any).migrationTime || 0
+        // Only import tokens that migrated AFTER our last one (with small buffer)
+        return tokenTime > (lastDate - bufferTime)
       })
-      console.log(`Filtered to ${tokensToProcess.length} new tokens (after ${new Date(lastDate * 1000).toISOString()})`)
+      console.log(`Filtered to ${tokensToProcess.length} new tokens (after ${new Date((lastDate - bufferTime) * 1000).toISOString()})`)
+      console.log(`Last migrated token date: ${new Date(lastDate * 1000).toISOString()}`)
+      console.log(`First token in list: ${sortedTokens[0] ? (sortedTokens[0].creationTime || (sortedTokens[0] as any).createdAt || 'unknown') : 'none'}`)
     } else {
       // If no previous migrations, don't import anything (to avoid importing old tokens)
       console.log("No previous migrations found - skipping import to avoid old tokens. Delete all migrated tokens first, then new ones will be imported.")
