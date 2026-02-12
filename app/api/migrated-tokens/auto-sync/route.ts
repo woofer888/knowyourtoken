@@ -60,23 +60,24 @@ export async function GET(request: NextRequest) {
     
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
-      // Use a small buffer (10 seconds) to account for timing differences and API delays
-      const bufferTime = 10
+      // NO buffer - only import tokens that are STRICTLY newer than our last one
+      // This prevents importing old tokens that might have similar timestamps
       tokensToProcess = sortedTokens.filter((token) => {
         // Try multiple fields - check for migration time, graduated time, or creation time
         const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
-        // Only import tokens that migrated AFTER our last one (with small buffer)
-        const isNewer = tokenTime > (lastDate - bufferTime)
-        if (!isNewer) {
-          console.log(`Skipping token - migration time ${new Date(tokenTime * 1000).toISOString()} is not after ${new Date((lastDate - bufferTime) * 1000).toISOString()}`)
+        // Only import tokens that migrated STRICTLY AFTER our last one (no buffer)
+        const isNewer = tokenTime > lastDate
+        if (!isNewer && sortedTokens.indexOf(token) < 5) {
+          // Log first 5 skipped tokens for debugging
+          console.log(`Skipping token - migration time ${new Date(tokenTime * 1000).toISOString()} is not after ${new Date(lastDate * 1000).toISOString()}`)
         }
         return isNewer
       })
-      console.log(`Filtered to ${tokensToProcess.length} new tokens (after ${new Date((lastDate - bufferTime) * 1000).toISOString()})`)
-      console.log(`Last migrated token in DB: ${new Date(lastDate * 1000).toISOString()}`)
+      console.log(`Filtered to ${tokensToProcess.length} new tokens (strictly after ${new Date(lastDate * 1000).toISOString()})`)
+      console.log(`Last migrated token in DB: ${lastMigrated.migrationDate.toISOString()} (timestamp: ${lastDate})`)
       if (sortedTokens.length > 0) {
         const firstTokenTime = (sortedTokens[0] as any).migrationTime || (sortedTokens[0] as any).graduatedAt || sortedTokens[0].creationTime || (sortedTokens[0] as any).createdAt || 0
-        console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
+        console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()} (timestamp: ${firstTokenTime})`)
       }
     } else {
       // If no previous migrations, DO NOT import anything automatically
