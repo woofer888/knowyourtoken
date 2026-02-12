@@ -9,10 +9,10 @@
   NODE_VERSION = "18"
 
 # Scheduled function to auto-sync migrated tokens every minute
+# Note: Scheduled functions need to be configured in Netlify Dashboard:
+# Go to: Site → Functions → Scheduled Functions → Add scheduled function
+# Function: auto-sync-migrated
+# Schedule: */1 * * * * (every minute)
 [[functions]]
   directory = "netlify/functions"
-
-# Configure the scheduled function
-[functions.auto-sync-migrated]
-  schedule = "*/1 * * * *"  # Every minute (cron format)
 
