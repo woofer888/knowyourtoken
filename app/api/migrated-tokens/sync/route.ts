@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { executeQuery } from "@/lib/db-query"
 import { fetchGraduatedTokens, fetchTokenMetadata, convertPumpFunTokenToDbFormat } from "@/lib/pumpfun-api"
 
 /**
@@ -14,18 +15,20 @@ export async function POST(request: NextRequest) {
     
     // Get the most recent migration date from our database
     // Only import tokens that migrated AFTER the last one we have
-    const lastMigrated = await prisma.token.findFirst({
-      where: {
-        migrated: true,
-        isPumpFun: true,
-      },
-      orderBy: {
-        migrationDate: "desc",
-      },
-      select: {
-        migrationDate: true,
-      },
-    })
+    const lastMigrated = await executeQuery(() =>
+      prisma.token.findFirst({
+        where: {
+          migrated: true,
+          isPumpFun: true,
+        },
+        orderBy: {
+          migrationDate: "desc",
+        },
+        select: {
+          migrationDate: true,
+        },
+      })
+    )
     
     // Fetch all graduated tokens from PumpFun
     const graduatedTokens = await fetchGraduatedTokens()
@@ -75,13 +78,25 @@ export async function POST(request: NextRequest) {
         console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
       }
     } else {
-      // If no previous migrations, import the most recent token to establish baseline
-      // For manual sync, we'll import the most recent one regardless of time
-      // This allows establishing a baseline even if the most recent migration was hours ago
+      // If no previous migrations, import the ACTUAL newest token to establish baseline
+      // Find the token with the highest migration time (most recent)
       if (sortedTokens.length > 0) {
-        tokensToProcess = [sortedTokens[0]] // Only the most recent one
-        const firstTokenTime = (tokensToProcess[0] as any).migrationTime || (tokensToProcess[0] as any).graduatedAt || tokensToProcess[0].creationTime || (tokensToProcess[0] as any).createdAt || 0
-        console.log(`No previous migrations found - importing most recent token to establish baseline. Migration time: ${new Date(firstTokenTime * 1000).toISOString()}`)
+        // The first token in sortedTokens should be the newest
+        // But let's verify by checking all tokens and finding the one with the highest time
+        let newestToken = sortedTokens[0]
+        let highestTime = (newestToken as any).migrationTime || (newestToken as any).graduatedAt || newestToken.creationTime || (newestToken as any).createdAt || 0
+        
+        for (const token of sortedTokens.slice(0, 10)) { // Check first 10 to find the actual newest
+          const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
+          if (tokenTime > highestTime) {
+            highestTime = tokenTime
+            newestToken = token
+          }
+        }
+        
+        tokensToProcess = [newestToken] // Only the actual newest one
+        const mint = newestToken.mint || (newestToken as any).coinMint || 'unknown'
+        console.log(`No previous migrations found - importing ACTUAL newest token (${mint.substring(0, 8)}...) to establish baseline. Migration time: ${new Date(highestTime * 1000).toISOString()} (${highestTime})`)
       } else {
         console.log("No previous migrations found and no tokens available")
         return NextResponse.json({
@@ -236,12 +251,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if token already exists by contract address
-        const existing = await prisma.token.findFirst({
-          where: {
-            contractAddress: cleanTokenData.contractAddress,
-            chain: cleanTokenData.chain,
-          },
-        })
+        const existing = await executeQuery(() =>
+          prisma.token.findFirst({
+            where: {
+              contractAddress: cleanTokenData.contractAddress,
+              chain: cleanTokenData.chain,
+            },
+          })
+        )
 
         if (existing) {
           // Skip if already exists - prevent duplicates
@@ -252,9 +269,11 @@ export async function POST(request: NextRequest) {
         // Token doesn't exist, create it
         {
           // Check if slug already exists (might be a different token with same name)
-          const slugExists = await prisma.token.findUnique({
-            where: { slug: cleanTokenData.slug },
-          })
+          const slugExists = await executeQuery(() =>
+            prisma.token.findUnique({
+              where: { slug: cleanTokenData.slug },
+            })
+          )
           
           if (slugExists) {
             // Generate unique slug by appending mint suffix
@@ -272,9 +291,11 @@ export async function POST(request: NextRequest) {
               chain: cleanTokenData.chain,
             })
             
-            await prisma.token.create({
-              data: cleanTokenData,
-            })
+            await executeQuery(() =>
+              prisma.token.create({
+                data: cleanTokenData,
+              })
+            )
             imported++
             console.log(`✓ Imported token: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
           } catch (createError: any) {

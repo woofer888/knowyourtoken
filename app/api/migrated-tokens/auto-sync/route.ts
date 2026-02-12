@@ -14,26 +14,30 @@ export const revalidate = 60 // Revalidate at most once per minute
 export async function GET(request: NextRequest) {
   try {
     // First, check if we have ANY migrated tokens at all
-    const migratedCount = await prisma.token.count({
-      where: {
-        migrated: true,
-        isPumpFun: true,
-      },
-    })
+    const migratedCount = await executeQuery(() =>
+      prisma.token.count({
+        where: {
+          migrated: true,
+          isPumpFun: true,
+        },
+      })
+    )
     
     // Get the most recent migration date from our database
-    const lastMigrated = await prisma.token.findFirst({
-      where: {
-        migrated: true,
-        isPumpFun: true,
-      },
-      orderBy: {
-        migrationDate: "desc",
-      },
-      select: {
-        migrationDate: true,
-      },
-    })
+    const lastMigrated = await executeQuery(() =>
+      prisma.token.findFirst({
+        where: {
+          migrated: true,
+          isPumpFun: true,
+        },
+        orderBy: {
+          migrationDate: "desc",
+        },
+        select: {
+          migrationDate: true,
+        },
+      })
+    )
 
     // Fetch graduated tokens
     const graduatedTokens = await fetchGraduatedTokens()
@@ -273,6 +277,7 @@ export async function GET(request: NextRequest) {
             // Check if it's a duplicate contract address
             if (createError.meta?.target?.includes('contractAddress')) {
               console.log(`Skipping ${mint} - duplicate contract address (already exists)`)
+              skippedExisting++
               continue
             }
             // Slug conflict, try with unique slug
@@ -289,14 +294,17 @@ export async function GET(request: NextRequest) {
               // If still fails due to duplicate contract, skip it
               if (retryError.code === 'P2002' && retryError.meta?.target?.includes('contractAddress')) {
                 console.log(`Skipping ${mint} - duplicate contract address (retry failed)`)
+                skippedExisting++
                 continue
               }
               console.error(`Error creating token ${mint} (retry):`, retryError)
               errors++
+              errorDetails.push(`Failed to create ${cleanTokenData.name} (retry): ${retryError.message || 'Unknown error'}`)
             }
           } else {
             console.error(`Error creating token ${mint}:`, createError)
             errors++
+            errorDetails.push(`Failed to create ${cleanTokenData.name}: ${createError.message || 'Unknown error'}`)
           }
         }
 
