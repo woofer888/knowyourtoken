@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma"
 import { fetchGraduatedTokens, fetchTokenMetadata, convertPumpFunTokenToDbFormat } from "@/lib/pumpfun-api"
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 60 // Revalidate at most once per minute
 
 /**
  * Lightweight auto-sync endpoint
  * Checks for new migrated tokens and imports only new ones
- * Can be called periodically (every 5-10 minutes) via cron or webhook
+ * Should be called at most once per minute
  */
 export async function GET(request: NextRequest) {
   try {

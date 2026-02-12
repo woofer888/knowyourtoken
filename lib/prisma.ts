@@ -17,13 +17,6 @@ export const prisma =
         url: process.env.DATABASE_URL,
       },
     },
-    // Add connection pool configuration
-    // This helps manage connections better in serverless environments
-    __internal: {
-      engine: {
-        connectTimeout: 10000, // 10 seconds
-      },
-    },
   })
 
 // In production, we still want to reuse the same instance
