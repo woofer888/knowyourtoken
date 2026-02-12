@@ -188,26 +188,13 @@ export async function POST(request: NextRequest) {
         })
 
         if (existing) {
-          // Update existing token
-          await prisma.token.update({
-            where: { id: existing.id },
-            data: {
-              name: cleanTokenData.name,
-              symbol: cleanTokenData.symbol,
-              description: cleanTokenData.description || existing.description,
-              logoUrl: cleanTokenData.logoUrl || existing.logoUrl,
-              twitterUrl: cleanTokenData.twitterUrl || existing.twitterUrl,
-              websiteUrl: cleanTokenData.websiteUrl || existing.websiteUrl,
-              telegramUrl: cleanTokenData.telegramUrl || existing.telegramUrl,
-              isPumpFun: true,
-              migrated: true,
-              migrationDate: cleanTokenData.migrationDate,
-              migrationDex: cleanTokenData.migrationDex,
-            },
-          })
-          updated++
-          console.log(`✓ Updated token: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
-        } else {
+          // Skip if already exists - prevent duplicates
+          console.log(`Skipping ${cleanTokenData.contractAddress} - already exists in database (preventing duplicate)`)
+          continue
+        }
+        
+        // Token doesn't exist, create it
+        {
           // Check if slug already exists (might be a different token with same name)
           const slugExists = await prisma.token.findUnique({
             where: { slug: cleanTokenData.slug },
@@ -245,6 +232,11 @@ export async function POST(request: NextRequest) {
             
             // Handle unique constraint errors
             if (createError.code === 'P2002') {
+              // Check if it's a duplicate contract address
+              if (createError.meta?.target?.includes('contractAddress')) {
+                console.log(`Token ${mint} already exists (duplicate contract address) - skipping`)
+                continue
+              }
               // Slug still conflicts, try with full mint
               cleanTokenData.slug = `token-${mint.substring(0, 16)}`
               try {
@@ -254,6 +246,11 @@ export async function POST(request: NextRequest) {
                 imported++
                 console.log(`✓ Imported token with unique slug: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
               } catch (retryError: any) {
+                // If still fails due to duplicate contract, skip it
+                if (retryError.code === 'P2002' && retryError.meta?.target?.includes('contractAddress')) {
+                  console.log(`Token ${mint} already exists - skipping duplicate`)
+                  continue
+                }
                 errorDetails.push(`Failed to create ${cleanTokenData.name}: ${retryError.message}`)
                 errors++
               }
