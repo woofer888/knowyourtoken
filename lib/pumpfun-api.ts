@@ -189,7 +189,7 @@ export function convertPumpFunTokenToDbFormat(
     migrated: true,
     migrationDate: creationTime ? new Date(creationTime * 1000) : new Date(),
     migrationDex: migrationDex,
-    published: false, // Start as draft for review
+    published: true, // Auto-publish migrated tokens
   }
 }
 
