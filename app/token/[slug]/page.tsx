@@ -13,20 +13,22 @@ import { Prisma } from "@prisma/client"
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string
-  }
+  }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params
+  
   try {
     const token = await prisma.token.findUnique({
-      where: { slug: params.slug },
+      where: { slug },
     })
 
     if (!token || !token.published) {
       return {
-        title: "Token Not Found",
+        title: "Token Not Found - KnowYourToken",
       }
     }
 
@@ -42,12 +44,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   } catch (error) {
     console.error('Database error in generateMetadata:', error)
     return {
-      title: "Token Not Found",
+      title: "Token Not Found - KnowYourToken",
     }
   }
 }
 
 export default async function TokenPage({ params }: PageProps) {
+  const { slug } = await params
   type TokenWithRelations = Prisma.TokenGetPayload<{
     include: {
       events: true
@@ -59,7 +62,7 @@ export default async function TokenPage({ params }: PageProps) {
   
   try {
     token = await prisma.token.findUnique({
-      where: { slug: params.slug },
+      where: { slug },
       include: {
         events: {
           orderBy: {

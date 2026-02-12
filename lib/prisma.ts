@@ -17,3 +17,10 @@ export const prisma =
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
+// Ensure connection is established (helps with cold starts)
+if (process.env.NODE_ENV === 'production') {
+  prisma.$connect().catch(() => {
+    // Connection will be established on first query
+  })
+}
+
