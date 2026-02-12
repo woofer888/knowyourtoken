@@ -23,9 +23,11 @@ export default async function HomePage() {
   }
   
   let trendingTokens: TokenCard[] = []
+  let recentlyMigrated: TokenCard[] = []
   let errorMessage: string | null = null
   
   try {
+    // Fetch trending tokens
     trendingTokens = await executeQuery(() =>
       prisma.token.findMany({
         where: {
@@ -48,12 +50,40 @@ export default async function HomePage() {
         },
       })
     )
-    console.log(`Found ${trendingTokens.length} tokens`)
+    console.log(`Found ${trendingTokens.length} trending tokens`)
+    
+    // Fetch recently migrated tokens (published, ordered by migration date)
+    recentlyMigrated = await executeQuery(() =>
+      prisma.token.findMany({
+        where: {
+          published: true,
+          migrated: true,
+          isPumpFun: true,
+        },
+        orderBy: {
+          migrationDate: "desc",
+        },
+        take: 6,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          symbol: true,
+          description: true,
+          chain: true,
+          logoUrl: true,
+          marketCap: true,
+          sentiment: true,
+        },
+      })
+    )
+    console.log(`Found ${recentlyMigrated.length} recently migrated tokens`)
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Database error:', error)
-    // Return empty array if database connection fails
+    // Return empty arrays if database connection fails
     trendingTokens = []
+    recentlyMigrated = []
   }
 
   return (
@@ -102,6 +132,34 @@ export default async function HomePage() {
             {errorMessage && (
               <p className="text-xs text-red-500 mt-2">Error: {errorMessage}</p>
             )}
+          </div>
+        )}
+      </section>
+
+      {/* Recently Migrated Tokens */}
+      <section className="space-y-6 py-12 border-t">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold">Recently Migrated</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              PumpFun tokens that recently migrated to DEXs
+            </p>
+          </div>
+          <Link href="/migrated">
+            <Button variant="outline">View All</Button>
+          </Link>
+        </div>
+        
+        {recentlyMigrated.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {recentlyMigrated.map((token) => (
+              <TokenCard key={token.id} token={token} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>No recently migrated tokens yet.</p>
+            <p className="text-sm mt-2">Tokens that migrate from PumpFun will appear here automatically.</p>
           </div>
         )}
       </section>
