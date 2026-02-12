@@ -71,30 +71,30 @@ export async function GET(request: NextRequest) {
         console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
       }
     } else {
-      // If no previous migrations, only import tokens that migrated VERY recently (last 5 minutes)
+      // If no previous migrations, only import tokens that migrated VERY recently (last 1 minute)
       // This prevents importing old historical tokens while allowing truly new ones to be imported
-      const fiveMinutesAgo = Math.floor((Date.now() - 5 * 60 * 1000) / 1000) // 5 minutes ago in seconds
+      const oneMinuteAgo = Math.floor((Date.now() - 1 * 60 * 1000) / 1000) // 1 minute ago in seconds
       
       tokensToProcess = sortedTokens.filter((token) => {
         const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
-        // Only import tokens that migrated in the last 5 minutes
-        return tokenTime > fiveMinutesAgo
+        // Only import tokens that migrated in the last 1 minute
+        return tokenTime > oneMinuteAgo
       })
       
       if (tokensToProcess.length === 0) {
-        console.log("No previous migrations found and no tokens migrated in the last 5 minutes")
+        console.log("No previous migrations found and no tokens migrated in the last 1 minute")
         return NextResponse.json({
-          message: "No previous migrations found. Only tokens migrated in the last 5 minutes will be imported. Use 'Sync All Migrated' to manually import a baseline.",
+          message: "No previous migrations found. Only tokens migrated in the last 1 minute will be imported. Use 'Sync All Migrated' to manually import a baseline.",
           imported: 0,
           checked: graduatedTokens.length,
           new: 0,
         })
       }
       
-      // Limit to 5 most recent tokens when establishing baseline
-      tokensToProcess = tokensToProcess.slice(0, 5)
+      // Limit to 1 most recent token when establishing baseline (to prevent importing multiple old tokens)
+      tokensToProcess = tokensToProcess.slice(0, 1)
       const firstTokenTime = (tokensToProcess[0] as any).migrationTime || (tokensToProcess[0] as any).graduatedAt || tokensToProcess[0].creationTime || (tokensToProcess[0] as any).createdAt || 0
-      console.log(`No previous migrations found - importing ${tokensToProcess.length} recent tokens (migrated in last 5 minutes) to establish baseline. Newest: ${new Date(firstTokenTime * 1000).toISOString()}`)
+      console.log(`No previous migrations found - importing 1 most recent token (migrated in last 1 minute) to establish baseline. Migration time: ${new Date(firstTokenTime * 1000).toISOString()}`)
     }
 
     // Limit to 20 max per sync to avoid timeout
@@ -182,16 +182,31 @@ export async function GET(request: NextRequest) {
             data: cleanTokenData,
           })
           imported++
-          console.log(`✓ Auto-imported: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
+          console.log(`✓ Auto-imported: ${cleanTokenData.name} (${cleanTokenData.symbol}) - ${mint.substring(0, 8)}...`)
         } catch (createError: any) {
           if (createError.code === 'P2002') {
+            // Check if it's a duplicate contract address
+            if (createError.meta?.target?.includes('contractAddress')) {
+              console.log(`Skipping ${mint} - duplicate contract address (already exists)`)
+              continue
+            }
             // Slug conflict, try with unique slug
             cleanTokenData.slug = `token-${mint.substring(0, 16)}`
-            await prisma.token.create({
-              data: cleanTokenData,
-            })
-            imported++
-            console.log(`✓ Auto-imported with unique slug: ${cleanTokenData.name}`)
+            try {
+              await prisma.token.create({
+                data: cleanTokenData,
+              })
+              imported++
+              console.log(`✓ Auto-imported with unique slug: ${cleanTokenData.name}`)
+            } catch (retryError: any) {
+              // If still fails due to duplicate contract, skip it
+              if (retryError.code === 'P2002' && retryError.meta?.target?.includes('contractAddress')) {
+                console.log(`Skipping ${mint} - duplicate contract address (retry failed)`)
+                continue
+              }
+              console.error(`Error creating token ${mint} (retry):`, retryError)
+              errors++
+            }
           } else {
             console.error(`Error creating token ${mint}:`, createError)
             errors++
