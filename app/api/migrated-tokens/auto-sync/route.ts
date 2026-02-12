@@ -173,8 +173,27 @@ export async function GET(request: NextRequest) {
         const tokenMigrationTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
         let migrationDate: Date
         if (tokenMigrationTime && tokenMigrationTime > 0) {
-          // Convert from seconds to Date
-          migrationDate = new Date(tokenMigrationTime * 1000)
+          // Determine if timestamp is in seconds or milliseconds
+          // Unix timestamps in seconds are < 10000000000 (year 2286)
+          // Unix timestamps in milliseconds are > 10000000000
+          let timestampMs: number
+          if (tokenMigrationTime < 10000000000) {
+            // It's in seconds, convert to milliseconds
+            timestampMs = tokenMigrationTime * 1000
+          } else {
+            // It's already in milliseconds
+            timestampMs = tokenMigrationTime
+          }
+          
+          migrationDate = new Date(timestampMs)
+          
+          // Validate the date is reasonable (not in the future by more than 1 year)
+          const now = Date.now()
+          const oneYearFromNow = now + (365 * 24 * 60 * 60 * 1000)
+          if (timestampMs > oneYearFromNow) {
+            console.warn(`Invalid migration date for ${mint.substring(0, 8)}...: ${migrationDate.toISOString()} (timestamp: ${tokenMigrationTime}). Using current time instead.`)
+            migrationDate = new Date()
+          }
         } else {
           // Fallback to current time if no migration time found
           migrationDate = new Date()

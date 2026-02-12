@@ -141,13 +141,32 @@ export function convertPumpFunTokenToDbFormat(
   // Try migrationTime or graduatedAt first, then fallback to creationTime
   let migrationTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || (token as any).created_at
   
+  // Normalize to seconds (Unix timestamp)
   if (typeof migrationTime === 'string') {
-    migrationTime = new Date(migrationTime).getTime() / 1000
-  } else if (migrationTime && typeof migrationTime === 'number' && migrationTime < 10000000000) {
-    // If it's already in seconds (Unix timestamp), use as-is
-  } else if (migrationTime && typeof migrationTime === 'number' && migrationTime > 10000000000) {
-    // If it's in milliseconds, convert to seconds
-    migrationTime = migrationTime / 1000
+    // If it's a string, try to parse it as a date
+    const parsed = new Date(migrationTime).getTime()
+    if (!isNaN(parsed)) {
+      migrationTime = parsed / 1000 // Convert to seconds
+    } else {
+      migrationTime = 0
+    }
+  } else if (migrationTime && typeof migrationTime === 'number') {
+    // If it's a number, check if it's in seconds or milliseconds
+    if (migrationTime > 10000000000) {
+      // It's in milliseconds, convert to seconds
+      migrationTime = migrationTime / 1000
+    }
+    // If it's < 10000000000, it's already in seconds, use as-is
+  } else {
+    migrationTime = 0
+  }
+  
+  // Validate the timestamp is reasonable (not in the future by more than 1 year)
+  const now = Date.now() / 1000 // Current time in seconds
+  const oneYearFromNow = now + (365 * 24 * 60 * 60)
+  if (migrationTime > oneYearFromNow) {
+    console.warn(`Invalid migration time: ${migrationTime} (${new Date(migrationTime * 1000).toISOString()}). Using current time instead.`)
+    migrationTime = now
   }
   
   // Use migrationTime as creationTime for the migration date
