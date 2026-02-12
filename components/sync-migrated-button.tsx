@@ -21,10 +21,22 @@ export function SyncMigratedButton() {
 
       if (response.ok) {
         const hasErrors = data.errors > 0
+        // Show first error detail if available, but truncate if too long
+        let errorMsg = ""
+        if (data.errorDetails && data.errorDetails.length > 0) {
+          const firstError = data.errorDetails[0]
+          errorMsg = firstError.length > 150 ? firstError.substring(0, 150) + "..." : firstError
+        }
+        
         setResult({
           success: !hasErrors,
-          message: `Sync completed: ${data.imported} imported, ${data.updated} updated${data.errors > 0 ? `, ${data.errors} errors` : ''}${data.errorDetails && data.errorDetails.length > 0 ? ` (${data.errorDetails[0]})` : ''}`,
+          message: `Sync completed: ${data.imported} imported, ${data.updated} updated${data.errors > 0 ? `, ${data.errors} errors` : ''}${errorMsg ? ` (${errorMsg})` : ''}`,
         })
+        
+        // Also log full error details to console for debugging
+        if (data.errorDetails && data.errorDetails.length > 0) {
+          console.error("Sync errors:", data.errorDetails)
+        }
       } else {
         setResult({
           success: false,

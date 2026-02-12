@@ -135,23 +135,47 @@ export async function POST(request: NextRequest) {
           
           // Create new token
           try {
+            // Log the data we're trying to create for debugging
+            console.log(`Creating token with data:`, {
+              name: tokenData.name,
+              symbol: tokenData.symbol,
+              slug: tokenData.slug,
+              contractAddress: tokenData.contractAddress,
+              chain: tokenData.chain,
+            })
+            
             await prisma.token.create({
               data: tokenData,
             })
             imported++
-            console.log(`Imported token: ${tokenData.name} (${tokenData.symbol})`)
+            console.log(`✓ Imported token: ${tokenData.name} (${tokenData.symbol})`)
           } catch (createError: any) {
+            // Log full error for debugging
+            console.error(`Error creating token ${mint}:`, {
+              error: createError.message,
+              code: createError.code,
+              meta: createError.meta,
+              data: tokenData,
+            })
+            
             // Handle unique constraint errors
             if (createError.code === 'P2002') {
               // Slug still conflicts, try with full mint
               tokenData.slug = `token-${mint.substring(0, 16)}`
-              await prisma.token.create({
-                data: tokenData,
-              })
-              imported++
-              console.log(`Imported token with unique slug: ${tokenData.name} (${tokenData.symbol})`)
+              try {
+                await prisma.token.create({
+                  data: tokenData,
+                })
+                imported++
+                console.log(`✓ Imported token with unique slug: ${tokenData.name} (${tokenData.symbol})`)
+              } catch (retryError: any) {
+                errorDetails.push(`Failed to create ${tokenData.name}: ${retryError.message}`)
+                errors++
+              }
             } else {
-              throw createError
+              // Other validation errors
+              errorDetails.push(`Failed to create ${tokenData.name}: ${createError.message}`)
+              errors++
             }
           }
         }
