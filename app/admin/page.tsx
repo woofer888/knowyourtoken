@@ -30,12 +30,19 @@ export default async function AdminPage() {
             Manage tokens, events, and gallery items
           </p>
         </div>
-        <Link href="/admin/tokens/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Token
-          </Button>
-        </Link>
+        <div className="flex items-center space-x-2">
+          <Link href="/admin/migrated-import">
+            <Button variant="outline">
+              Import Migrated Token
+            </Button>
+          </Link>
+          <Link href="/admin/tokens/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Token
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <AdminTokenList tokens={tokens} />
