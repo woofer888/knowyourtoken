@@ -71,21 +71,30 @@ export async function GET(request: NextRequest) {
         console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
       }
     } else {
-      // If no previous migrations, import ONLY the most recent token to establish a baseline
-      // This prevents importing old historical tokens while allowing new ones to be imported going forward
-      if (sortedTokens.length > 0) {
-        tokensToProcess = [sortedTokens[0]] // Only the most recent one
-        const firstTokenTime = (sortedTokens[0] as any).migrationTime || (sortedTokens[0] as any).graduatedAt || sortedTokens[0].creationTime || (sortedTokens[0] as any).createdAt || 0
-        console.log(`No previous migrations found - importing most recent token to establish baseline: ${new Date(firstTokenTime * 1000).toISOString()}`)
-      } else {
-        console.log("No previous migrations and no tokens from API")
+      // If no previous migrations, only import tokens that migrated VERY recently (last 5 minutes)
+      // This prevents importing old historical tokens while allowing truly new ones to be imported
+      const fiveMinutesAgo = Math.floor((Date.now() - 5 * 60 * 1000) / 1000) // 5 minutes ago in seconds
+      
+      tokensToProcess = sortedTokens.filter((token) => {
+        const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
+        // Only import tokens that migrated in the last 5 minutes
+        return tokenTime > fiveMinutesAgo
+      })
+      
+      if (tokensToProcess.length === 0) {
+        console.log("No previous migrations found and no tokens migrated in the last 5 minutes")
         return NextResponse.json({
-          message: "No previous migrations found and no tokens available from API",
+          message: "No previous migrations found. Only tokens migrated in the last 5 minutes will be imported. Use 'Sync All Migrated' to manually import a baseline.",
           imported: 0,
           checked: graduatedTokens.length,
           new: 0,
         })
       }
+      
+      // Limit to 5 most recent tokens when establishing baseline
+      tokensToProcess = tokensToProcess.slice(0, 5)
+      const firstTokenTime = (tokensToProcess[0] as any).migrationTime || (tokensToProcess[0] as any).graduatedAt || tokensToProcess[0].creationTime || (tokensToProcess[0] as any).createdAt || 0
+      console.log(`No previous migrations found - importing ${tokensToProcess.length} recent tokens (migrated in last 5 minutes) to establish baseline. Newest: ${new Date(firstTokenTime * 1000).toISOString()}`)
     }
 
     // Limit to 20 max per sync to avoid timeout
