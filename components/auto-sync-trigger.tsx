@@ -29,6 +29,9 @@ export function AutoSyncTrigger() {
           if (data.checked !== undefined) {
             console.log(`Auto-sync checked ${data.checked} tokens, found ${data.new || 0} new ones`)
           }
+          if (data.errors > 0 && data.errorDetails) {
+            console.log(`Auto-sync errors (${data.errors} total):`, data.errorDetails)
+          }
         }
         
         lastSyncRef.current = Date.now()
