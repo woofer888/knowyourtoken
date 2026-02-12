@@ -127,6 +127,7 @@ export async function GET(request: NextRequest) {
         
         if (!mint) {
           errors++
+          errorDetails.push(`Token missing mint address`)
           continue
         }
 
@@ -193,6 +194,8 @@ export async function GET(request: NextRequest) {
         // First check: token must have creationTime from PumpFun
         if (!token.creationTime || token.creationTime <= 0) {
           console.log(`Skipping ${mint.substring(0, 8)}... - token missing creationTime from PumpFun`)
+          errors++
+          errorDetails.push(`${mint.substring(0, 8)}... - missing creationTime`)
           continue
         }
         
@@ -214,6 +217,8 @@ export async function GET(request: NextRequest) {
         // This filters out old tokens that haven't graduated (like moonshot)
         if (!hasCompletionStatus && !isRecent) {
           console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status and is not recent (age: ${Math.floor(tokenAge / 3600)}h) - likely not graduated/migrated`)
+          errors++
+          errorDetails.push(`${mint.substring(0, 8)}... - no completion status and not recent`)
           continue
         }
         
@@ -227,6 +232,8 @@ export async function GET(request: NextRequest) {
         
         if (!metadata) {
           console.log(`Skipping ${mint.substring(0, 8)}... - token not found in PumpFun API (may have launched directly on Jupiter)`)
+          errors++
+          errorDetails.push(`${mint.substring(0, 8)}... - not found in PumpFun API`)
           continue
         }
         
@@ -235,6 +242,8 @@ export async function GET(request: NextRequest) {
         const metadataMint = metadata.mint || (metadata as any).mint || (metadata as any).coinMint
         if (metadataMint && metadataMint !== mint) {
           console.log(`Skipping ${mint.substring(0, 8)}... - metadata mint mismatch (${metadataMint} vs ${mint})`)
+          errors++
+          errorDetails.push(`${mint.substring(0, 8)}... - metadata mint mismatch`)
           continue
         }
         
@@ -329,8 +338,12 @@ export async function GET(request: NextRequest) {
         // Small delay
         await new Promise(resolve => setTimeout(resolve, 200))
       } catch (error) {
-        console.error(`Error importing token:`, error)
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        const mint = token.mint || (token as any).coinMint || 'unknown'
+        console.error(`Error importing token ${mint.substring(0, 8)}...:`, errorMsg)
+        console.error(`Full error:`, error)
         errors++
+        errorDetails.push(`${mint.substring(0, 8)}... - ${errorMsg.substring(0, 100)}`)
       }
     }
 
@@ -344,6 +357,7 @@ export async function GET(request: NextRequest) {
       new: tokensToProcess.length,
       skippedExisting,
       skippedTooOld,
+      errorDetails: errorDetails.slice(0, 5), // Return first 5 errors for debugging
     })
   } catch (error) {
     console.error("Error in auto-sync:", error)
