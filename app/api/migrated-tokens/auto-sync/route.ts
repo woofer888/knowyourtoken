@@ -321,7 +321,7 @@ export async function GET(request: NextRequest) {
       new: tokensToProcess.length,
       skippedExisting,
       skippedTooOld,
-      errorDetails: errorDetails.slice(0, 5), // Return first 5 errors for debugging
+      errorDetails: errorDetails ? errorDetails.slice(0, 5) : [], // Return first 5 errors for debugging
     })
   } catch (error) {
     console.error("Error in auto-sync:", error)
