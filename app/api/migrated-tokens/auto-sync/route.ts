@@ -201,15 +201,23 @@ export async function GET(request: NextRequest) {
         
         // CRITICAL: Double-check that this token is newer than our last one
         // This prevents importing old tokens even if they passed the initial filter
-        // Use same buffer (30 seconds) as the initial filter
+        // Use the SAME timestamp source (tokenTime) that we used in the initial filter
+        // Don't use migrationDate because it might have been converted/validated differently
         if (lastMigrated?.migrationDate) {
           const lastDate = lastMigrated.migrationDate.getTime() / 1000
-          const thisDate = migrationDate.getTime() / 1000
-          const bufferTime = 30
-          if (thisDate <= (lastDate - bufferTime)) {
-            const timeDiff = lastDate - thisDate
-            console.log(`Skipping ${mint.substring(0, 8)}... - migration date ${migrationDate.toISOString()} (${thisDate}) is ${timeDiff.toFixed(1)}s before last migrated ${lastMigrated.migrationDate.toISOString()} (${lastDate})`)
+          // Use the same tokenTime we extracted earlier, but normalize it to seconds
+          let tokenTimeSeconds = tokenMigrationTime
+          if (tokenMigrationTime > 10000000000) {
+            // It's in milliseconds, convert to seconds
+            tokenTimeSeconds = tokenMigrationTime / 1000
+          }
+          // Use same buffer (60 seconds) as the initial filter
+          const bufferTime = 60
+          if (tokenTimeSeconds <= (lastDate - bufferTime)) {
+            const timeDiff = lastDate - tokenTimeSeconds
+            console.log(`Skipping ${mint.substring(0, 8)}... - token time ${new Date(tokenTimeSeconds * 1000).toISOString()} (${tokenTimeSeconds}) is ${timeDiff.toFixed(1)}s before last migrated ${lastMigrated.migrationDate.toISOString()} (${lastDate})`)
             skippedTooOld++
+            errorDetails.push(`${mint.substring(0, 8)}... - too old (migrated ${timeDiff.toFixed(1)}s before last)`)
             continue
           }
         }
