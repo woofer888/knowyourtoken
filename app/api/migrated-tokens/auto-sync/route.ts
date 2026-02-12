@@ -43,29 +43,31 @@ export async function GET(request: NextRequest) {
       return timeB - timeA // Descending order (newest first)
     })
 
-    // Filter to only NEW tokens that migrated very recently
-    // Only import tokens that migrated in the last 1 hour to avoid importing old historical tokens
-    const oneHourAgo = Math.floor((Date.now() - 60 * 60 * 1000) / 1000) // 1 hour ago in seconds
+    // Filter to ONLY tokens that migrated AFTER our last one
+    // NO old tokens - only import if we have a last migration date to compare against
+    let tokensToProcess: typeof sortedTokens = []
     
-    let tokensToProcess = sortedTokens.filter((token) => {
-      const tokenTime = token.creationTime || (token as any).createdAt || 0
-      // Only include tokens that migrated in the last hour
-      return tokenTime > oneHourAgo
-    })
-
-    // Also check if we have a last migration date - only import tokens newer than that
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
-      tokensToProcess = tokensToProcess.filter((token) => {
+      tokensToProcess = sortedTokens.filter((token) => {
         const tokenTime = token.creationTime || (token as any).createdAt || 0
+        // Only import tokens that migrated AFTER our last one
         return tokenTime > lastDate
+      })
+      console.log(`Filtered to ${tokensToProcess.length} new tokens (after ${new Date(lastDate * 1000).toISOString()})`)
+    } else {
+      // If no previous migrations, don't import anything (to avoid importing old tokens)
+      console.log("No previous migrations found - skipping import to avoid old tokens. Delete all migrated tokens first, then new ones will be imported.")
+      return NextResponse.json({
+        message: "No previous migrations found. Delete all migrated tokens first, then new ones will be imported automatically.",
+        imported: 0,
+        checked: graduatedTokens.length,
+        new: 0,
       })
     }
 
     // Limit to 20 max per sync to avoid timeout
     tokensToProcess = tokensToProcess.slice(0, 20)
-    
-    console.log(`Filtered to ${tokensToProcess.length} tokens migrated in the last hour (after ${new Date(oneHourAgo * 1000).toISOString()})`)
 
     if (tokensToProcess.length === 0) {
       return NextResponse.json({
@@ -87,7 +89,7 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // Check if already exists
+        // Check if already exists by contract address (prevent duplicates)
         const existing = await prisma.token.findFirst({
           where: {
             contractAddress: mint,
@@ -96,7 +98,8 @@ export async function GET(request: NextRequest) {
         })
 
         if (existing) {
-          continue // Skip if already exists
+          console.log(`Skipping ${mint} - already exists in database`)
+          continue // Skip if already exists - prevent duplicates
         }
 
         // Fetch metadata
