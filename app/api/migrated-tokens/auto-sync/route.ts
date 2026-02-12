@@ -123,16 +123,17 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // CRITICAL: Verify the mint address looks like a PumpFun token
-        // PumpFun tokens typically have "pump" in the address or specific patterns
-        // Tokens that launched directly on Jupiter won't have this
+        // Log which token we're processing
+        console.log(`Processing token: ${mint.substring(0, 8)}... (full: ${mint})`)
+        
+        // Note: If token is in graduated list, it should be valid
+        // Don't be too strict with address pattern - just log a warning
         const isPumpFunAddress = 
           mint.toLowerCase().includes('pump') || // Has "pump" in address
-          mint.length === 44 // Standard Solana address length (PumpFun tokens are Solana)
+          mint.length === 44 // Standard Solana address length
         
         if (!isPumpFunAddress) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - address doesn't match PumpFun pattern`)
-          continue
+          console.log(`Warning: ${mint.substring(0, 8)}... - address doesn't match PumpFun pattern, but continuing since it's in graduated list`)
         }
 
         // Check if already exists by contract address (prevent duplicates)

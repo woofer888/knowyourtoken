@@ -124,18 +124,21 @@ export async function POST(request: NextRequest) {
           continue
         }
         
+        // Log which token we're processing
+        console.log(`Processing token: ${mint.substring(0, 8)}... (full: ${mint})`)
+        
         // CRITICAL: Verify the mint address looks like a PumpFun token
         // PumpFun tokens typically have "pump" in the address or specific patterns
+        // But don't be too strict - if it's in the graduated list, it should be valid
         const isPumpFunAddress = 
           mint.toLowerCase().includes('pump') || // Has "pump" in address
           mint.length === 44 // Standard Solana address length
         
         if (!isPumpFunAddress) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - address doesn't match PumpFun pattern`)
-          continue
+          console.log(`Warning: ${mint.substring(0, 8)}... - address doesn't match PumpFun pattern, but continuing since it's in graduated list`)
+          // Don't skip - if it's in the graduated list, it should be valid
+          // Just log a warning
         }
-        
-        console.log(`Processing token: ${mint.substring(0, 8)}... (full: ${mint})`)
 
         // Try to get name and symbol from the token object directly
         // The graduated tokens endpoint might not have name/symbol, so we'll fetch metadata
@@ -184,17 +187,16 @@ export async function POST(request: NextRequest) {
           const tokenAge = Date.now() / 1000 - token.creationTime
           const isRecent = tokenAge < 3600 // Less than 1 hour old
           
-          // For tokens without completion status, require they be very recent AND have "pump" in address
+          // For tokens without completion status, be more lenient
+          // If it's in the graduated list and has metadata from PumpFun, it's likely valid
           if (!hasCompletionStatus) {
-            if (!isRecent) {
-              console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status and is not recent (age: ${Math.floor(tokenAge / 3600)}h) - may not have migrated from PumpFun`)
+            // Only skip if it's old AND doesn't have "pump" in address
+            if (!isRecent && !mint.toLowerCase().includes('pump')) {
+              console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status, is not recent (age: ${Math.floor(tokenAge / 3600)}h), and no "pump" in address - may not have migrated from PumpFun`)
               continue
             }
-            // Even if recent, if it doesn't have "pump" in address, be suspicious
-            if (!mint.toLowerCase().includes('pump')) {
-              console.log(`Skipping ${mint.substring(0, 8)}... - recent token without completion status and no "pump" in address - may not be from PumpFun`)
-              continue
-            }
+            // If it has "pump" in address OR is recent, allow it
+            console.log(`Allowing ${mint.substring(0, 8)}... - no completion status but ${isRecent ? 'recent' : 'has "pump" in address'}`)
           }
         } catch (err) {
           console.warn(`Error fetching metadata for ${mint}:`, err)
