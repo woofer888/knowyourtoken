@@ -20,9 +20,10 @@ export function SyncMigratedButton() {
       const data = await response.json()
 
       if (response.ok) {
+        const hasErrors = data.errors > 0
         setResult({
-          success: true,
-          message: `Sync completed: ${data.imported} imported, ${data.updated} updated${data.errors > 0 ? `, ${data.errors} errors` : ''}`,
+          success: !hasErrors,
+          message: `Sync completed: ${data.imported} imported, ${data.updated} updated${data.errors > 0 ? `, ${data.errors} errors` : ''}${data.errorDetails && data.errorDetails.length > 0 ? ` (${data.errorDetails[0]})` : ''}`,
         })
       } else {
         setResult({

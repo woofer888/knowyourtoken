@@ -118,30 +118,47 @@ export async function fetchTokenMetadata(
  * Convert PumpFun token data to our database format
  */
 export function convertPumpFunTokenToDbFormat(
-  token: PumpFunGraduatedToken | PumpFunTokenMetadata,
+  token: PumpFunGraduatedToken | PumpFunTokenMetadata | any,
   migrationDex: string = "PumpSwap"
 ) {
-  const metadata = "metadata" in token ? token.metadata : null
+  // Handle different response formats
+  const metadata = token.metadata || null
+  const mint = token.mint || token.mintAddress || token.address || ""
+  
+  // Extract name and symbol from various possible locations
+  const name = token.name || metadata?.name || (token as any).name || ""
+  const symbol = token.symbol || metadata?.symbol || (token as any).symbol || ""
+  const description = token.description || metadata?.description || null
+  const imageUri = token.imageUri || metadata?.image || token.image || null
+  
+  // Extract social links
+  const twitter = token.twitter || (token as any).twitterUrl || null
+  const telegram = token.telegram || (token as any).telegramUrl || null
+  const website = token.website || (token as any).websiteUrl || null
+  
+  // Extract creation time
+  let creationTime = token.creationTime || (token as any).createdAt || (token as any).created_at
+  if (typeof creationTime === 'string') {
+    creationTime = new Date(creationTime).getTime() / 1000
+  }
   
   return {
-    name: token.name || metadata?.name || "",
-    symbol: token.symbol || metadata?.symbol || "",
-    slug: (token.name || metadata?.name || "")
+    name: name,
+    symbol: symbol,
+    slug: name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, ""),
-    contractAddress: "mint" in token ? token.mint : "",
+      .replace(/(^-|-$)/g, "") || `token-${mint.substring(0, 8)}`,
+    contractAddress: mint,
     chain: "Solana",
-    description: token.description || metadata?.description || null,
-    logoUrl: token.imageUri || metadata?.image || null,
-    twitterUrl: token.twitter || null,
-    telegramUrl: token.telegram || null,
-    websiteUrl: token.website || null,
+    description: description,
+    logoUrl: imageUri,
+    twitterUrl: twitter ? (twitter.startsWith('http') ? twitter : `https://twitter.com/${twitter.replace('@', '')}`) : null,
+    telegramUrl: telegram ? (telegram.startsWith('http') ? telegram : `https://t.me/${telegram.replace('@', '').replace('/', '')}`) : null,
+    websiteUrl: website ? (website.startsWith('http') ? website : `https://${website}`) : null,
     isPumpFun: true,
     migrated: true,
-    migrationDate: "creationTime" in token && token.creationTime
-      ? new Date(token.creationTime * 1000)
-      : new Date(),
+    migrationDate: creationTime ? new Date(creationTime * 1000) : new Date(),
     migrationDex: migrationDex,
     published: false, // Start as draft for review
   }
