@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
           migrated: true,
           migrationDate: tokenData.migrationDate || new Date(),
           migrationDex: tokenData.migrationDex || "PumpSwap",
-          published: false,
+          published: true, // Auto-publish migrated tokens
         }
 
         // Check if token already exists by contract address

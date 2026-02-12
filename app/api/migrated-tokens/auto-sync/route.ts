@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
           migrated: true,
           migrationDate: tokenData.migrationDate || new Date(),
           migrationDex: tokenData.migrationDex || "PumpSwap",
-          published: false,
+          published: true, // Auto-publish migrated tokens
         }
         
         // Check if slug exists and make it unique if needed
