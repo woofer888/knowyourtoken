@@ -182,18 +182,34 @@ export async function GET(request: NextRequest) {
           continue
         }
         
-        // Third check: Verify the metadata indicates it's from PumpFun
-        // Tokens that migrated from PumpFun should have metadata with PumpFun-related fields
-        const hasPumpFunMetadata = 
-          metadata.mint === mint || // Metadata matches
-          (metadata as any).mint === mint ||
-          metadata.name || // Has name from PumpFun
-          metadata.symbol // Has symbol from PumpFun
-        
-        if (!hasPumpFunMetadata) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - metadata doesn't indicate PumpFun origin`)
+        // Third check: Verify the token actually exists and has valid PumpFun data
+        // Check if metadata has the mint address matching (proves it's from PumpFun)
+        const metadataMint = metadata.mint || (metadata as any).mint || (metadata as any).coinMint
+        if (metadataMint && metadataMint !== mint) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - metadata mint mismatch (${metadataMint} vs ${mint})`)
           continue
         }
+        
+        // Fourth check: Verify token has completion status from PumpFun bonding curve
+        // Tokens that migrated should have completed the bonding curve
+        const hasCompletionStatus = 
+          (token as any).complete === true || 
+          (token as any).curveComplete === true ||
+          (metadata as any).complete === true ||
+          (metadata as any).curveComplete === true
+        
+        // If no completion status, check if it's a very recent token (might still be migrating)
+        // But if it's old and has no completion status, it's suspicious
+        const tokenAge = Date.now() / 1000 - token.creationTime
+        const isRecent = tokenAge < 3600 // Less than 1 hour old
+        
+        if (!hasCompletionStatus && !isRecent) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status and is not recent (age: ${Math.floor(tokenAge / 3600)}h) - may not have migrated from PumpFun`)
+          continue
+        }
+        
+        // Log token details for debugging
+        console.log(`✓ Validating token ${mint.substring(0, 8)}... - has metadata: ${!!metadata}, completion: ${hasCompletionStatus}, recent: ${isRecent}`)
         
         const tokenData = convertPumpFunTokenToDbFormat(
           metadata || token,
