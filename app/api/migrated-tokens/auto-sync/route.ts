@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
 
     for (const token of tokensToProcess) {
       try {
-        const mint = token.mint || (token as any).address
+        // Handle different response formats - API returns 'coinMint'
+        const mint = token.mint || (token as any).coinMint || (token as any).address || (token as any).mintAddress
         
         if (!mint) {
           errors++

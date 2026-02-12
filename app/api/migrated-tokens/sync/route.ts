@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
     for (const token of tokensToProcess) {
       try {
         // Handle different response formats from PumpFun API
-        const mint = token.mint || (token as any).address || (token as any).mintAddress
+        // The API returns 'coinMint' not 'mint'
+        const mint = token.mint || (token as any).coinMint || (token as any).address || (token as any).mintAddress
         
         if (!mint) {
           console.warn("Token missing mint address:", JSON.stringify(token, null, 2))
@@ -46,24 +47,40 @@ export async function POST(request: NextRequest) {
         }
 
         // Try to get name and symbol from the token object directly
+        // The graduated tokens endpoint might not have name/symbol, so we'll fetch metadata
         const tokenName = token.name || (token as any).name || ""
         const tokenSymbol = token.symbol || (token as any).symbol || ""
         
-        if (!tokenName || !tokenSymbol) {
-          console.warn(`Token ${mint} missing name or symbol, trying to fetch metadata...`)
-        }
+        // If we don't have name/symbol, we MUST fetch metadata
+        const needsMetadata = !tokenName || !tokenSymbol
 
-        // Fetch detailed metadata (this might fail, that's OK)
+        // Fetch detailed metadata (required if we don't have name/symbol)
         let metadata = null
         try {
           metadata = await fetchTokenMetadata(mint)
+          if (!metadata) {
+            console.warn(`Could not fetch metadata for ${mint}`)
+            if (needsMetadata) {
+              errorDetails.push(`Token ${mint} missing name/symbol and metadata fetch failed`)
+              errors++
+              continue
+            }
+          }
         } catch (err) {
-          console.warn(`Could not fetch metadata for ${mint}, using token data directly`)
+          console.warn(`Error fetching metadata for ${mint}:`, err)
+          if (needsMetadata) {
+            errorDetails.push(`Token ${mint} missing name/symbol and metadata fetch error`)
+            errors++
+            continue
+          }
         }
         
-        // Use metadata if available, otherwise use token data
+        // Use metadata if available (it has more complete data), otherwise use token data
         const sourceData = metadata || token
         const tokenData = convertPumpFunTokenToDbFormat(sourceData, "PumpSwap")
+        
+        // Make sure we use the correct mint address
+        tokenData.contractAddress = mint
         
         // Validate required fields
         if (!tokenData.name || !tokenData.symbol || !tokenData.contractAddress) {

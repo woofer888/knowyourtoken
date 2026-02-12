@@ -122,8 +122,9 @@ export function convertPumpFunTokenToDbFormat(
   migrationDex: string = "PumpSwap"
 ) {
   // Handle different response formats
+  // PumpFun API returns 'coinMint' in the graduated tokens endpoint
   const metadata = token.metadata || null
-  const mint = token.mint || token.mintAddress || token.address || ""
+  const mint = token.mint || token.coinMint || token.mintAddress || token.address || ""
   
   // Extract name and symbol from various possible locations
   const name = token.name || metadata?.name || (token as any).name || ""
