@@ -9,13 +9,46 @@ export const dynamic = 'force-dynamic'
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Delete all tokens that are marked as migrated and from PumpFun
+    // First, delete related events and gallery items (cascade delete)
+    const tokensToDelete = await prisma.token.findMany({
+      where: {
+        migrated: true,
+        isPumpFun: true,
+      },
+      select: {
+        id: true,
+      },
+    })
+
+    const tokenIds = tokensToDelete.map(t => t.id)
+
+    // Delete related events
+    await prisma.tokenEvent.deleteMany({
+      where: {
+        tokenId: {
+          in: tokenIds,
+        },
+      },
+    })
+
+    // Delete related gallery items
+    await prisma.tokenMedia.deleteMany({
+      where: {
+        tokenId: {
+          in: tokenIds,
+        },
+      },
+    })
+
+    // Now delete all tokens that are marked as migrated and from PumpFun
     const result = await prisma.token.deleteMany({
       where: {
         migrated: true,
         isPumpFun: true,
       },
     })
+
+    console.log(`Deleted ${result.count} migrated tokens and their related data`)
 
     return NextResponse.json({
       message: `Deleted ${result.count} migrated tokens`,

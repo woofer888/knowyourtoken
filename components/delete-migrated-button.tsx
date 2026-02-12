@@ -9,7 +9,7 @@ export function DeleteMigratedButton() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete ALL migrated PumpFun tokens? This cannot be undone.")) {
+    if (!confirm("Are you sure you want to delete ALL migrated PumpFun tokens? This will delete all old migrated tokens. Only new migrations will be imported going forward. This cannot be undone.")) {
       return
     }
 
