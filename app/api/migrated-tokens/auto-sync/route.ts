@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Filter to only new tokens (if we have a last migration date)
+    // Import ALL tokens that migrated since the last check
     let tokensToProcess = sortedTokens
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
@@ -53,8 +54,9 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Only sync the last 3 migrated tokens (most recent)
-    tokensToProcess = tokensToProcess.slice(0, 3)
+    // Import all new tokens (no limit) - if more than 3 migrated in the last minute, import all of them
+    // Limit to 50 max per sync to avoid timeout, but this should rarely happen
+    tokensToProcess = tokensToProcess.slice(0, 50)
 
     if (tokensToProcess.length === 0) {
       return NextResponse.json({
