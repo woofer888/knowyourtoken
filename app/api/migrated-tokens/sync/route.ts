@@ -147,6 +147,17 @@ export async function POST(request: NextRequest) {
           continue
         }
         
+        // CRITICAL: Verify token has actually graduated/migrated
+        // Tokens that haven't graduated yet won't have completion status
+        const hasCompletionStatus = 
+          (token as any).complete === true || 
+          (token as any).curveComplete === true
+        
+        if (!hasCompletionStatus) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - token has not completed bonding curve (not graduated/migrated yet)`)
+          continue
+        }
+        
         // Second check: Try to fetch metadata from PumpFun API
         // If the token doesn't exist on PumpFun, it never migrated from there
         let metadata = null
@@ -166,29 +177,6 @@ export async function POST(request: NextRequest) {
           if (metadataMint && metadataMint !== mint) {
             console.log(`Skipping ${mint.substring(0, 8)}... - metadata mint mismatch`)
             continue
-          }
-          
-          // Fourth check: Verify token has completion status from PumpFun bonding curve
-          const hasCompletionStatus = 
-            (token as any).complete === true || 
-            (token as any).curveComplete === true ||
-            (metadata as any).complete === true ||
-            (metadata as any).curveComplete === true
-          
-          // If no completion status, check if it's a very recent token
-          const tokenAge = Date.now() / 1000 - token.creationTime
-          const isRecent = tokenAge < 3600 // Less than 1 hour old
-          
-          // For tokens without completion status, be more lenient
-          // If it's in the graduated list and has metadata from PumpFun, it's likely valid
-          if (!hasCompletionStatus) {
-            // Only skip if it's old AND doesn't have "pump" in address
-            if (!isRecent && !mint.toLowerCase().includes('pump')) {
-              console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status, is not recent (age: ${Math.floor(tokenAge / 3600)}h), and no "pump" in address - may not have migrated from PumpFun`)
-              continue
-            }
-            // If it has "pump" in address OR is recent, allow it
-            console.log(`Allowing ${mint.substring(0, 8)}... - no completion status but ${isRecent ? 'recent' : 'has "pump" in address'}`)
           }
         } catch (err) {
           console.warn(`Error fetching metadata for ${mint}:`, err)
