@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Filter to ONLY tokens that migrated AFTER our last one
-    // NO old tokens - only import if we have a last migration date to compare against
+    // If no previous migrations, import only the most recent token to establish a baseline
     let tokensToProcess: typeof sortedTokens = []
     
     if (lastMigrated?.migrationDate) {
@@ -71,14 +71,21 @@ export async function GET(request: NextRequest) {
         console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
       }
     } else {
-      // If no previous migrations, don't import anything (to avoid importing old tokens)
-      console.log("No previous migrations found - skipping import to avoid old tokens. Delete all migrated tokens first, then new ones will be imported.")
-      return NextResponse.json({
-        message: "No previous migrations found. Delete all migrated tokens first, then new ones will be imported automatically.",
-        imported: 0,
-        checked: graduatedTokens.length,
-        new: 0,
-      })
+      // If no previous migrations, import ONLY the most recent token to establish a baseline
+      // This prevents importing old historical tokens while allowing new ones to be imported going forward
+      if (sortedTokens.length > 0) {
+        tokensToProcess = [sortedTokens[0]] // Only the most recent one
+        const firstTokenTime = (sortedTokens[0] as any).migrationTime || (sortedTokens[0] as any).graduatedAt || sortedTokens[0].creationTime || (sortedTokens[0] as any).createdAt || 0
+        console.log(`No previous migrations found - importing most recent token to establish baseline: ${new Date(firstTokenTime * 1000).toISOString()}`)
+      } else {
+        console.log("No previous migrations and no tokens from API")
+        return NextResponse.json({
+          message: "No previous migrations found and no tokens available from API",
+          imported: 0,
+          checked: graduatedTokens.length,
+          new: 0,
+        })
+      }
     }
 
     // Limit to 20 max per sync to avoid timeout
