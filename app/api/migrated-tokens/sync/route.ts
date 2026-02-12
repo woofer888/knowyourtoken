@@ -75,20 +75,17 @@ export async function POST(request: NextRequest) {
         console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
       }
     } else {
-      // If no previous migrations, only import tokens that migrated VERY recently (last 1 minute)
-      // This prevents importing old historical tokens while allowing truly new ones to be imported
-      const oneMinuteAgo = Math.floor((Date.now() - 1 * 60 * 1000) / 1000) // 1 minute ago in seconds
-      
-      tokensToProcess = sortedTokens.filter((token) => {
-        const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
-        // Only import tokens that migrated in the last 1 minute
-        return tokenTime > oneMinuteAgo
-      })
-      
-      if (tokensToProcess.length === 0) {
-        console.log("No previous migrations found and no tokens migrated in the last 1 minute")
+      // If no previous migrations, import the most recent token to establish baseline
+      // For manual sync, we'll import the most recent one regardless of time
+      // This allows establishing a baseline even if the most recent migration was hours ago
+      if (sortedTokens.length > 0) {
+        tokensToProcess = [sortedTokens[0]] // Only the most recent one
+        const firstTokenTime = (tokensToProcess[0] as any).migrationTime || (tokensToProcess[0] as any).graduatedAt || tokensToProcess[0].creationTime || (tokensToProcess[0] as any).createdAt || 0
+        console.log(`No previous migrations found - importing most recent token to establish baseline. Migration time: ${new Date(firstTokenTime * 1000).toISOString()}`)
+      } else {
+        console.log("No previous migrations found and no tokens available")
         return NextResponse.json({
-          message: "No previous migrations found. Only tokens migrated in the last 1 minute will be imported. This prevents importing old historical tokens.",
+          message: "No previous migrations found and no tokens available from API.",
           imported: 0,
           updated: 0,
           errors: 0,
@@ -96,11 +93,6 @@ export async function POST(request: NextRequest) {
           processed: 0,
         })
       }
-      
-      // Limit to 1 most recent token when establishing baseline (manual sync allows more)
-      tokensToProcess = tokensToProcess.slice(0, 1)
-      const firstTokenTime = (tokensToProcess[0] as any).migrationTime || (tokensToProcess[0] as any).graduatedAt || tokensToProcess[0].creationTime || (tokensToProcess[0] as any).createdAt || 0
-      console.log(`No previous migrations found - importing 1 most recent token (migrated in last 1 minute) to establish baseline. Migration time: ${new Date(firstTokenTime * 1000).toISOString()}`)
     }
     
     // Limit to 20 max per sync
