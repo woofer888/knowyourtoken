@@ -127,7 +127,8 @@ export async function GET(request: NextRequest) {
         })
 
         if (existing) {
-          console.log(`Skipping ${mint} - already exists in database`)
+          console.log(`Skipping ${mint.substring(0, 8)}... - already exists in database`)
+          skippedExisting++
           continue // Skip if already exists - prevent duplicates
         }
 
@@ -145,11 +146,15 @@ export async function GET(request: NextRequest) {
         
         // CRITICAL: Double-check that this token is newer than our last one
         // This prevents importing old tokens even if they passed the initial filter
+        // Use same buffer (2 seconds) as the initial filter
         if (lastMigrated?.migrationDate) {
           const lastDate = lastMigrated.migrationDate.getTime() / 1000
           const thisDate = migrationDate.getTime() / 1000
-          if (thisDate <= lastDate) {
-            console.log(`Skipping ${mint.substring(0, 8)}... - migration date ${migrationDate.toISOString()} (${thisDate}) is not after last migrated ${lastMigrated.migrationDate.toISOString()} (${lastDate})`)
+          const bufferTime = 2
+          if (thisDate <= (lastDate - bufferTime)) {
+            const timeDiff = lastDate - thisDate
+            console.log(`Skipping ${mint.substring(0, 8)}... - migration date ${migrationDate.toISOString()} (${thisDate}) is ${timeDiff.toFixed(1)}s before last migrated ${lastMigrated.migrationDate.toISOString()} (${lastDate})`)
+            skippedTooOld++
             continue
           }
         }
@@ -244,11 +249,15 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      message: "Auto-sync completed",
+      message: imported > 0 
+        ? `Auto-sync completed: imported ${imported} tokens` 
+        : `Auto-sync completed: found ${tokensToProcess.length} new tokens but imported 0 (${skippedExisting} already exist, ${skippedTooOld} too old, ${errors} errors)`,
       imported,
       errors,
       checked: graduatedTokens.length,
       new: tokensToProcess.length,
+      skippedExisting,
+      skippedTooOld,
     })
   } catch (error) {
     console.error("Error in auto-sync:", error)
