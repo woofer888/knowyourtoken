@@ -94,12 +94,64 @@ export async function GET(request: NextRequest) {
           metadata || token,
           "PumpSwap"
         )
+        
+        // Ensure contractAddress is set
+        tokenData.contractAddress = mint
+        if (!tokenData.chain) {
+          tokenData.chain = "Solana"
+        }
+        
+        // Clean and validate data (same as sync route)
+        const cleanTokenData = {
+          name: (tokenData.name || `Token ${mint.substring(0, 8)}`).trim(),
+          symbol: (tokenData.symbol || "UNKNOWN").trim(),
+          slug: (tokenData.slug || `token-${mint.substring(0, 16)}`).trim(),
+          contractAddress: mint.trim(),
+          chain: (tokenData.chain || "Solana").trim(),
+          description: tokenData.description || null,
+          lore: null,
+          originStory: null,
+          logoUrl: tokenData.logoUrl || null,
+          twitterUrl: tokenData.twitterUrl || null,
+          telegramUrl: tokenData.telegramUrl || null,
+          websiteUrl: tokenData.websiteUrl || null,
+          isPumpFun: true,
+          migrated: true,
+          migrationDate: tokenData.migrationDate || new Date(),
+          migrationDex: tokenData.migrationDex || "PumpSwap",
+          published: false,
+        }
+        
+        // Check if slug exists and make it unique if needed
+        const slugExists = await prisma.token.findUnique({
+          where: { slug: cleanTokenData.slug },
+        })
+        
+        if (slugExists) {
+          cleanTokenData.slug = `${cleanTokenData.slug}-${mint.substring(0, 8)}`
+        }
 
         // Create new token
-        await prisma.token.create({
-          data: tokenData,
-        })
-        imported++
+        try {
+          await prisma.token.create({
+            data: cleanTokenData,
+          })
+          imported++
+          console.log(`✓ Auto-imported: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
+        } catch (createError: any) {
+          if (createError.code === 'P2002') {
+            // Slug conflict, try with unique slug
+            cleanTokenData.slug = `token-${mint.substring(0, 16)}`
+            await prisma.token.create({
+              data: cleanTokenData,
+            })
+            imported++
+            console.log(`✓ Auto-imported with unique slug: ${cleanTokenData.name}`)
+          } else {
+            console.error(`Error creating token ${mint}:`, createError)
+            errors++
+          }
+        }
 
         // Small delay
         await new Promise(resolve => setTimeout(resolve, 200))
