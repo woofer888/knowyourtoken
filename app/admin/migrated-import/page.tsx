@@ -76,11 +76,11 @@ export default function MigratedImportPage() {
                 id="contractAddress"
                 value={contractAddress}
                 onChange={(e) => setContractAddress(e.target.value)}
-                placeholder="Enter contract address (e.g., EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm)"
+                placeholder="Enter token mint address from PumpFun"
                 required
               />
               <p className="text-xs text-muted-foreground">
-                The system will automatically fetch name, symbol, logo, and other data
+                The system will automatically fetch name, symbol, logo, description, and social links from PumpFun API
               </p>
             </div>
 

@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { fetchTokenData } from "@/lib/token-data-fetcher"
+import { fetchTokenMetadata, convertPumpFunTokenToDbFormat } from "@/lib/pumpfun-api"
 
 /**
- * Import a migrated token by contract address
- * Fetches token data automatically and creates/updates the token
+ * Import a migrated token by contract address (mint)
+ * Fetches token data from PumpFun API automatically
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { contractAddress, chain = "Solana", migrationDex = "PumpSwap" } = body
+    const { contractAddress, migrationDex = "PumpSwap" } = body
 
     if (!contractAddress) {
       return NextResponse.json(
-        { error: "Contract address is required" },
+        { error: "Contract address (mint) is required" },
         { status: 400 }
       )
     }
@@ -22,25 +22,22 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.token.findFirst({
       where: {
         contractAddress: contractAddress,
-        chain: chain,
+        chain: "Solana",
       },
     })
 
-    // Fetch token data from APIs
-    const tokenData = await fetchTokenData(contractAddress, chain)
+    // Fetch token metadata from PumpFun API
+    const pumpfunData = await fetchTokenMetadata(contractAddress)
 
-    if (!tokenData) {
+    if (!pumpfunData) {
       return NextResponse.json(
-        { error: "Could not fetch token data. Please add manually." },
+        { error: "Could not fetch token data from PumpFun. Please check the contract address." },
         { status: 404 }
       )
     }
 
-    // Generate slug from name
-    const slug = tokenData.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
+    // Convert to database format
+    const tokenData = convertPumpFunTokenToDbFormat(pumpfunData, migrationDex)
 
     if (existing) {
       // Update existing token
@@ -49,41 +46,26 @@ export async function POST(request: NextRequest) {
         data: {
           name: tokenData.name,
           symbol: tokenData.symbol,
+          description: tokenData.description || existing.description,
           logoUrl: tokenData.logoUrl || existing.logoUrl,
           twitterUrl: tokenData.twitterUrl || existing.twitterUrl,
           websiteUrl: tokenData.websiteUrl || existing.websiteUrl,
           telegramUrl: tokenData.telegramUrl || existing.telegramUrl,
           isPumpFun: true,
           migrated: true,
-          migrationDate: new Date(),
+          migrationDate: tokenData.migrationDate,
           migrationDex: migrationDex,
         },
       })
 
       return NextResponse.json({
-        message: "Token updated",
+        message: "Token updated successfully",
         token: updated,
       })
     } else {
       // Create new token
       const newToken = await prisma.token.create({
-        data: {
-          name: tokenData.name,
-          symbol: tokenData.symbol,
-          slug: slug,
-          description: tokenData.description,
-          contractAddress: contractAddress,
-          chain: chain,
-          logoUrl: tokenData.logoUrl,
-          twitterUrl: tokenData.twitterUrl,
-          websiteUrl: tokenData.websiteUrl,
-          telegramUrl: tokenData.telegramUrl,
-          isPumpFun: true,
-          migrated: true,
-          migrationDate: new Date(),
-          migrationDex: migrationDex,
-          published: false, // Start as draft for review
-        },
+        data: tokenData,
       })
 
       return NextResponse.json({

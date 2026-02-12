@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { AdminTokenList } from "@/components/admin-token-list"
 import { Button } from "@/components/ui/button"
+import { SyncMigratedButton } from "@/components/sync-migrated-button"
 import Link from "next/link"
 import { Plus } from "lucide-react"
 
@@ -30,10 +31,11 @@ export default async function AdminPage() {
             Manage tokens, events, and gallery items
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          <SyncMigratedButton />
           <Link href="/admin/migrated-import">
             <Button variant="outline">
-              Import Migrated Token
+              Import by Address
             </Button>
           </Link>
           <Link href="/admin/tokens/new">
