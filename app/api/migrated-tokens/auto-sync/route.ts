@@ -108,6 +108,10 @@ export async function GET(request: NextRequest) {
 
     let imported = 0
     let errors = 0
+    let skippedExisting = 0
+    let skippedTooOld = 0
+
+    console.log(`Processing ${tokensToProcess.length} tokens to import...`)
 
     for (const token of tokensToProcess) {
       try {
