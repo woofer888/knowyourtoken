@@ -137,16 +137,21 @@ export function convertPumpFunTokenToDbFormat(
   const telegram = token.telegram || (token as any).telegramUrl || null
   const website = token.website || (token as any).websiteUrl || null
   
-  // Extract creation time - handle different formats
-  let creationTime = token.creationTime || (token as any).createdAt || (token as any).created_at
-  if (typeof creationTime === 'string') {
-    creationTime = new Date(creationTime).getTime() / 1000
-  } else if (creationTime && typeof creationTime === 'number' && creationTime < 10000000000) {
+  // Extract migration time - for graduated tokens, this is when they migrated, not when created
+  // Try migrationTime or graduatedAt first, then fallback to creationTime
+  let migrationTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || (token as any).created_at
+  
+  if (typeof migrationTime === 'string') {
+    migrationTime = new Date(migrationTime).getTime() / 1000
+  } else if (migrationTime && typeof migrationTime === 'number' && migrationTime < 10000000000) {
     // If it's already in seconds (Unix timestamp), use as-is
-  } else if (creationTime && typeof creationTime === 'number' && creationTime > 10000000000) {
+  } else if (migrationTime && typeof migrationTime === 'number' && migrationTime > 10000000000) {
     // If it's in milliseconds, convert to seconds
-    creationTime = creationTime / 1000
+    migrationTime = migrationTime / 1000
   }
+  
+  // Use migrationTime as creationTime for the migration date
+  const creationTime = migrationTime
   
   // Generate slug from name, or fallback to mint-based slug
   // Ensure slug is never empty

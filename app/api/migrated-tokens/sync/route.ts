@@ -40,10 +40,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Sort by creationTime descending to get newest first
+    // Sort by migration time descending to get newest first
+    // Note: For graduated tokens, we need the actual migration time, not creation time
     const sortedTokens = [...graduatedTokens].sort((a, b) => {
-      const timeA = a.creationTime || (a as any).createdAt || 0
-      const timeB = b.creationTime || (b as any).createdAt || 0
+      // Try to get migration time, fallback to creation time
+      const timeA = (a as any).migrationTime || (a as any).graduatedAt || a.creationTime || (a as any).createdAt || 0
+      const timeB = (b as any).migrationTime || (b as any).graduatedAt || b.creationTime || (b as any).createdAt || 0
       return timeB - timeA // Descending order (newest first)
     })
 
@@ -53,17 +55,25 @@ export async function POST(request: NextRequest) {
     
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
-      // Use a small buffer (5 seconds) to account for timing differences
-      const bufferTime = 5
+      // Use a small buffer (10 seconds) to account for timing differences and API delays
+      const bufferTime = 10
       tokensToProcess = sortedTokens.filter((token) => {
-        // Try multiple fields - migration might be tracked differently
-        const tokenTime = token.creationTime || (token as any).createdAt || (token as any).migrationTime || 0
+        // Try multiple fields - check for migration time, graduated time, or creation time
+        const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
         // Only import tokens that migrated AFTER our last one (with small buffer)
-        return tokenTime > (lastDate - bufferTime)
+        const isNewer = tokenTime > (lastDate - bufferTime)
+        if (!isNewer && sortedTokens.indexOf(token) < 3) {
+          // Log first few skipped tokens for debugging
+          console.log(`Skipping token - migration time ${new Date(tokenTime * 1000).toISOString()} is not after ${new Date((lastDate - bufferTime) * 1000).toISOString()}`)
+        }
+        return isNewer
       })
       console.log(`Filtered to ${tokensToProcess.length} new tokens (after ${new Date((lastDate - bufferTime) * 1000).toISOString()})`)
-      console.log(`Last migrated token date: ${new Date(lastDate * 1000).toISOString()}`)
-      console.log(`First token in list: ${sortedTokens[0] ? (sortedTokens[0].creationTime || (sortedTokens[0] as any).createdAt || 'unknown') : 'none'}`)
+      console.log(`Last migrated token in DB: ${new Date(lastDate * 1000).toISOString()}`)
+      if (sortedTokens.length > 0) {
+        const firstTokenTime = (sortedTokens[0] as any).migrationTime || (sortedTokens[0] as any).graduatedAt || sortedTokens[0].creationTime || (sortedTokens[0] as any).createdAt || 0
+        console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
+      }
     } else {
       // If no previous migrations, don't import anything (to avoid importing old tokens)
       console.log("No previous migrations found - skipping import to avoid old tokens. Delete all migrated tokens first, then new ones will be imported.")
