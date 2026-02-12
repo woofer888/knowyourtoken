@@ -30,8 +30,14 @@ export async function POST(request: NextRequest) {
     let errors = 0
     const errorDetails: string[] = []
 
-    // Process each token (limit to first 50 to avoid timeout)
-    const tokensToProcess = graduatedTokens.slice(0, 50)
+    // Process only the last 3 migrated tokens (most recent)
+    // Sort by creationTime descending to get newest first, then take last 3
+    const sortedTokens = [...graduatedTokens].sort((a, b) => {
+      const timeA = a.creationTime || (a as any).createdAt || 0
+      const timeB = b.creationTime || (b as any).createdAt || 0
+      return timeB - timeA // Descending order (newest first)
+    })
+    const tokensToProcess = sortedTokens.slice(0, 3) // Only last 3
     
     for (const token of tokensToProcess) {
       try {
