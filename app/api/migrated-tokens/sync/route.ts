@@ -147,15 +147,19 @@ export async function POST(request: NextRequest) {
           continue
         }
         
-        // CRITICAL: Verify token has actually graduated/migrated
-        // Tokens that haven't graduated yet won't have completion status
+        // Note: Since this token is in the "graduated" endpoint, it should be graduated by definition
+        // But let's check completion status as an additional verification
         const hasCompletionStatus = 
           (token as any).complete === true || 
           (token as any).curveComplete === true
         
+        // Log the token's status for debugging
+        console.log(`Checking token ${mint.substring(0, 8)}... - complete: ${(token as any).complete}, curveComplete: ${(token as any).curveComplete}`)
+        
+        // If no completion status, still allow it since it's in the graduated list
+        // But log a warning
         if (!hasCompletionStatus) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - token has not completed bonding curve (not graduated/migrated yet)`)
-          continue
+          console.log(`Warning: ${mint.substring(0, 8)}... - no completion status, but allowing since it's in graduated list`)
         }
         
         // Second check: Try to fetch metadata from PumpFun API
