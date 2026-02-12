@@ -128,6 +128,29 @@ export async function GET(request: NextRequest) {
           continue // Skip if already exists - prevent duplicates
         }
 
+        // Get the actual migration time from the token BEFORE fetching metadata
+        // This is critical - we need to use the time from the graduated tokens list, not metadata
+        const tokenMigrationTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
+        let migrationDate: Date
+        if (tokenMigrationTime && tokenMigrationTime > 0) {
+          // Convert from seconds to Date
+          migrationDate = new Date(tokenMigrationTime * 1000)
+        } else {
+          // Fallback to current time if no migration time found
+          migrationDate = new Date()
+        }
+        
+        // CRITICAL: Double-check that this token is newer than our last one
+        // This prevents importing old tokens even if they passed the initial filter
+        if (lastMigrated?.migrationDate) {
+          const lastDate = lastMigrated.migrationDate.getTime() / 1000
+          const thisDate = migrationDate.getTime() / 1000
+          if (thisDate <= lastDate) {
+            console.log(`Skipping ${mint.substring(0, 8)}... - migration date ${migrationDate.toISOString()} (${thisDate}) is not after last migrated ${lastMigrated.migrationDate.toISOString()} (${lastDate})`)
+            continue
+          }
+        }
+        
         // Fetch metadata
         const metadata = await fetchTokenMetadata(mint)
         const tokenData = convertPumpFunTokenToDbFormat(
@@ -142,6 +165,7 @@ export async function GET(request: NextRequest) {
         }
         
         // Clean and validate data (same as sync route)
+        // Use the migration date we extracted from the token, not from tokenData
         const cleanTokenData = {
           name: (tokenData.name || `Token ${mint.substring(0, 8)}`).trim(),
           symbol: (tokenData.symbol || "UNKNOWN").trim(),
@@ -157,7 +181,7 @@ export async function GET(request: NextRequest) {
           websiteUrl: tokenData.websiteUrl || null,
           isPumpFun: true,
           migrated: true,
-          migrationDate: tokenData.migrationDate || new Date(),
+          migrationDate: migrationDate, // Use the actual migration time from the token, not from metadata
           migrationDex: tokenData.migrationDex || "PumpSwap",
           published: true, // Auto-publish migrated tokens
         }
