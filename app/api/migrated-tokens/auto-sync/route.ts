@@ -117,6 +117,7 @@ export async function GET(request: NextRequest) {
     let errors = 0
     let skippedExisting = 0
     let skippedTooOld = 0
+    const errorDetails: string[] = []
 
     console.log(`Processing ${tokensToProcess.length} tokens to import...`)
 
