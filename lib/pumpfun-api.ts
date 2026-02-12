@@ -50,19 +50,36 @@ export async function fetchGraduatedTokens(): Promise<PumpFunGraduatedToken[]> {
     const response = await fetch(
       "https://advanced-api-v2.pump.fun/coins/graduated?sortBy=creationTime",
       {
-        next: { revalidate: 300 }, // Cache for 5 minutes
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json",
+        },
+        cache: "no-store", // Always fetch fresh data
       }
     )
 
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`PumpFun API error: ${response.status} - ${errorText}`)
       throw new Error(`PumpFun API error: ${response.status}`)
     }
 
     const data = await response.json()
-    return data || []
+    
+    // Handle different response formats
+    if (Array.isArray(data)) {
+      return data
+    } else if (data?.data && Array.isArray(data.data)) {
+      return data.data
+    } else if (data?.coins && Array.isArray(data.coins)) {
+      return data.coins
+    }
+    
+    console.warn("Unexpected response format from PumpFun API:", data)
+    return []
   } catch (error) {
     console.error("Error fetching graduated tokens from PumpFun:", error)
-    return []
+    throw error // Re-throw to let caller handle
   }
 }
 
@@ -76,11 +93,16 @@ export async function fetchTokenMetadata(
     const response = await fetch(
       `https://frontend-api-v3.pump.fun/coins/${mint}`,
       {
-        next: { revalidate: 300 }, // Cache for 5 minutes
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json",
+        },
+        cache: "no-store",
       }
     )
 
     if (!response.ok) {
+      console.warn(`Failed to fetch metadata for ${mint}: ${response.status}`)
       return null
     }
 

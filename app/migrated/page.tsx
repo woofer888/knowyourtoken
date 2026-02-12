@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { TokenCard } from "@/components/token-card"
 import { Badge } from "@/components/ui/badge"
 import { Prisma } from "@prisma/client"
+import { AutoSyncTrigger } from "@/components/auto-sync-trigger"
 
 export const dynamic = 'force-dynamic'
 
@@ -56,12 +57,16 @@ export default async function MigratedTokensPage() {
 
   return (
     <div className="container py-8 md:py-12">
+      <AutoSyncTrigger />
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-4xl font-bold mb-2">Migrated Tokens</h1>
             <p className="text-muted-foreground">
               PumpFun tokens that have successfully migrated to DEXs
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              New tokens are automatically imported when you visit this page
             </p>
           </div>
           <Badge variant="outline" className="text-lg px-4 py-2">

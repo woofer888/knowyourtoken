@@ -6,10 +6,16 @@ import { fetchGraduatedTokens, fetchTokenMetadata, convertPumpFunTokenToDbFormat
  * Sync all graduated/migrated tokens from PumpFun
  * This endpoint can be called periodically (via cron job or manually)
  */
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
+    console.log("Starting sync of graduated tokens...")
+    
     // Fetch all graduated tokens from PumpFun
     const graduatedTokens = await fetchGraduatedTokens()
+
+    console.log(`Found ${graduatedTokens.length} graduated tokens`)
 
     if (graduatedTokens.length === 0) {
       return NextResponse.json({
@@ -22,60 +28,106 @@ export async function POST(request: NextRequest) {
     let imported = 0
     let updated = 0
     let errors = 0
+    const errorDetails: string[] = []
 
-    // Process each token
-    for (const token of graduatedTokens) {
+    // Process each token (limit to first 50 to avoid timeout)
+    const tokensToProcess = graduatedTokens.slice(0, 50)
+    
+    for (const token of tokensToProcess) {
       try {
-        // Fetch detailed metadata
-        const metadata = await fetchTokenMetadata(token.mint)
+        const mint = token.mint || (token as any).address
         
-        if (!metadata) {
-          console.warn(`Could not fetch metadata for ${token.mint}`)
+        if (!mint) {
+          console.warn("Token missing mint address:", token)
           errors++
           continue
         }
 
-        // Check if token already exists
-        const existing = await prisma.token.findFirst({
-          where: {
-            contractAddress: token.mint,
-            chain: "Solana",
-          },
-        })
-
-        const tokenData = convertPumpFunTokenToDbFormat(metadata, "PumpSwap")
-
-        if (existing) {
-          // Update existing token
-          await prisma.token.update({
-            where: { id: existing.id },
-            data: {
-              name: tokenData.name,
-              symbol: tokenData.symbol,
-              description: tokenData.description || existing.description,
-              logoUrl: tokenData.logoUrl || existing.logoUrl,
-              twitterUrl: tokenData.twitterUrl || existing.twitterUrl,
-              websiteUrl: tokenData.websiteUrl || existing.websiteUrl,
-              telegramUrl: tokenData.telegramUrl || existing.telegramUrl,
-              isPumpFun: true,
-              migrated: true,
-              migrationDate: tokenData.migrationDate,
-              migrationDex: tokenData.migrationDex,
+        // Fetch detailed metadata
+        const metadata = await fetchTokenMetadata(mint)
+        
+        if (!metadata) {
+          // Try using the token data directly if metadata fetch fails
+          const tokenData = convertPumpFunTokenToDbFormat(token, "PumpSwap")
+          
+          // Check if token already exists
+          const existing = await prisma.token.findFirst({
+            where: {
+              contractAddress: mint,
+              chain: "Solana",
             },
           })
-          updated++
+
+          if (existing) {
+            await prisma.token.update({
+              where: { id: existing.id },
+              data: {
+                name: tokenData.name,
+                symbol: tokenData.symbol,
+                description: tokenData.description || existing.description,
+                logoUrl: tokenData.logoUrl || existing.logoUrl,
+                twitterUrl: tokenData.twitterUrl || existing.twitterUrl,
+                websiteUrl: tokenData.websiteUrl || existing.websiteUrl,
+                telegramUrl: tokenData.telegramUrl || existing.telegramUrl,
+                isPumpFun: true,
+                migrated: true,
+                migrationDate: tokenData.migrationDate,
+                migrationDex: tokenData.migrationDex,
+              },
+            })
+            updated++
+          } else {
+            await prisma.token.create({
+              data: tokenData,
+            })
+            imported++
+          }
         } else {
-          // Create new token
-          await prisma.token.create({
-            data: tokenData,
+          // Use fetched metadata
+          const tokenData = convertPumpFunTokenToDbFormat(metadata, "PumpSwap")
+
+          // Check if token already exists
+          const existing = await prisma.token.findFirst({
+            where: {
+              contractAddress: mint,
+              chain: "Solana",
+            },
           })
-          imported++
+
+          if (existing) {
+            // Update existing token
+            await prisma.token.update({
+              where: { id: existing.id },
+              data: {
+                name: tokenData.name,
+                symbol: tokenData.symbol,
+                description: tokenData.description || existing.description,
+                logoUrl: tokenData.logoUrl || existing.logoUrl,
+                twitterUrl: tokenData.twitterUrl || existing.twitterUrl,
+                websiteUrl: tokenData.websiteUrl || existing.websiteUrl,
+                telegramUrl: tokenData.telegramUrl || existing.telegramUrl,
+                isPumpFun: true,
+                migrated: true,
+                migrationDate: tokenData.migrationDate,
+                migrationDex: tokenData.migrationDex,
+              },
+            })
+            updated++
+          } else {
+            // Create new token
+            await prisma.token.create({
+              data: tokenData,
+            })
+            imported++
+          }
         }
 
         // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 200))
       } catch (error) {
-        console.error(`Error processing token ${token.mint}:`, error)
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        console.error(`Error processing token:`, error)
+        errorDetails.push(errorMsg)
         errors++
       }
     }
@@ -86,11 +138,17 @@ export async function POST(request: NextRequest) {
       updated,
       errors,
       total: graduatedTokens.length,
+      processed: tokensToProcess.length,
+      errorDetails: errorDetails.slice(0, 5), // Return first 5 errors
     })
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
     console.error("Error syncing migrated tokens:", error)
     return NextResponse.json(
-      { error: "Failed to sync migrated tokens" },
+      { 
+        error: "Failed to sync migrated tokens",
+        details: errorMsg 
+      },
       { status: 500 }
     )
   }
