@@ -18,11 +18,17 @@ export function AutoSyncTrigger() {
         const data = await response.json()
         
         if (data.imported > 0) {
-          console.log(`Auto-sync imported ${data.imported} new tokens`)
+          console.log(`✓ Auto-sync imported ${data.imported} new tokens`)
           // Refresh the page to show new tokens
           window.location.reload()
-        } else if (data.message) {
-          console.log(`Auto-sync: ${data.message}`)
+        } else {
+          // Log the response for debugging
+          if (data.message) {
+            console.log(`Auto-sync: ${data.message}`)
+          }
+          if (data.checked !== undefined) {
+            console.log(`Auto-sync checked ${data.checked} tokens, found ${data.new || 0} new ones`)
+          }
         }
         
         lastSyncRef.current = Date.now()
