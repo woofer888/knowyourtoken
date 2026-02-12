@@ -10,6 +10,8 @@ import { TokenImage } from "@/components/token-image"
 import type { Metadata } from "next"
 import { Prisma } from "@prisma/client"
 
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   params: {
     slug: string
