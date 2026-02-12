@@ -82,23 +82,61 @@ export async function POST(request: NextRequest) {
         // Make sure we use the correct mint address
         tokenData.contractAddress = mint
         
-        // Validate required fields
-        if (!tokenData.name || !tokenData.symbol || !tokenData.contractAddress || !tokenData.slug) {
-          const missing = []
-          if (!tokenData.name) missing.push("name")
-          if (!tokenData.symbol) missing.push("symbol")
-          if (!tokenData.contractAddress) missing.push("contractAddress")
-          if (!tokenData.slug) missing.push("slug")
-          errorDetails.push(`Token ${mint} missing required fields: ${missing.join(", ")}`)
+        // Ensure chain is set (required field)
+        if (!tokenData.chain) {
+          tokenData.chain = "Solana"
+        }
+        
+        // Validate required fields with detailed checks
+        const validationErrors: string[] = []
+        if (!tokenData.name || typeof tokenData.name !== 'string' || tokenData.name.trim() === '') {
+          validationErrors.push("name (empty or invalid)")
+        }
+        if (!tokenData.symbol || typeof tokenData.symbol !== 'string' || tokenData.symbol.trim() === '') {
+          validationErrors.push("symbol (empty or invalid)")
+        }
+        if (!tokenData.contractAddress || typeof tokenData.contractAddress !== 'string' || tokenData.contractAddress.trim() === '') {
+          validationErrors.push("contractAddress (empty or invalid)")
+        }
+        if (!tokenData.slug || typeof tokenData.slug !== 'string' || tokenData.slug.trim() === '') {
+          validationErrors.push("slug (empty or invalid)")
+        }
+        if (!tokenData.chain || typeof tokenData.chain !== 'string' || tokenData.chain.trim() === '') {
+          validationErrors.push("chain (empty or invalid)")
+        }
+        
+        if (validationErrors.length > 0) {
+          errorDetails.push(`Token ${mint} validation failed: ${validationErrors.join(", ")}`)
           errors++
           continue
+        }
+        
+        // Clean up the data - ensure no undefined values that Prisma doesn't like
+        const cleanTokenData = {
+          name: tokenData.name.trim(),
+          symbol: tokenData.symbol.trim(),
+          slug: tokenData.slug.trim(),
+          contractAddress: tokenData.contractAddress.trim(),
+          chain: tokenData.chain.trim(),
+          description: tokenData.description || null,
+          lore: null,
+          originStory: null,
+          logoUrl: tokenData.logoUrl || null,
+          twitterUrl: tokenData.twitterUrl || null,
+          telegramUrl: tokenData.telegramUrl || null,
+          websiteUrl: tokenData.websiteUrl || null,
+          isPumpFun: true,
+          migrated: true,
+          migrationDate: tokenData.migrationDate || new Date(),
+          migrationDex: tokenData.migrationDex || "PumpSwap",
+          published: false,
         }
 
         // Check if token already exists by contract address
         const existing = await prisma.token.findFirst({
           where: {
-            contractAddress: mint,
-            chain: "Solana",
+            contractAddress: cleanTokenData.contractAddress,
+            chain: cleanTokenData.chain,
           },
         })
 
@@ -107,74 +145,75 @@ export async function POST(request: NextRequest) {
           await prisma.token.update({
             where: { id: existing.id },
             data: {
-              name: tokenData.name,
-              symbol: tokenData.symbol,
-              description: tokenData.description || existing.description,
-              logoUrl: tokenData.logoUrl || existing.logoUrl,
-              twitterUrl: tokenData.twitterUrl || existing.twitterUrl,
-              websiteUrl: tokenData.websiteUrl || existing.websiteUrl,
-              telegramUrl: tokenData.telegramUrl || existing.telegramUrl,
+              name: cleanTokenData.name,
+              symbol: cleanTokenData.symbol,
+              description: cleanTokenData.description || existing.description,
+              logoUrl: cleanTokenData.logoUrl || existing.logoUrl,
+              twitterUrl: cleanTokenData.twitterUrl || existing.twitterUrl,
+              websiteUrl: cleanTokenData.websiteUrl || existing.websiteUrl,
+              telegramUrl: cleanTokenData.telegramUrl || existing.telegramUrl,
               isPumpFun: true,
               migrated: true,
-              migrationDate: tokenData.migrationDate,
-              migrationDex: tokenData.migrationDex,
+              migrationDate: cleanTokenData.migrationDate,
+              migrationDex: cleanTokenData.migrationDex,
             },
           })
           updated++
-          console.log(`Updated token: ${tokenData.name} (${tokenData.symbol})`)
+          console.log(`✓ Updated token: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
         } else {
           // Check if slug already exists (might be a different token with same name)
           const slugExists = await prisma.token.findUnique({
-            where: { slug: tokenData.slug },
+            where: { slug: cleanTokenData.slug },
           })
           
           if (slugExists) {
             // Generate unique slug by appending mint suffix
-            tokenData.slug = `${tokenData.slug}-${mint.substring(0, 8)}`
+            cleanTokenData.slug = `${cleanTokenData.slug}-${mint.substring(0, 8)}`
           }
           
           // Create new token
           try {
             // Log the data we're trying to create for debugging
-            console.log(`Creating token with data:`, {
-              name: tokenData.name,
-              symbol: tokenData.symbol,
-              slug: tokenData.slug,
-              contractAddress: tokenData.contractAddress,
-              chain: tokenData.chain,
+            console.log(`Creating token:`, {
+              name: cleanTokenData.name,
+              symbol: cleanTokenData.symbol,
+              slug: cleanTokenData.slug,
+              contractAddress: cleanTokenData.contractAddress,
+              chain: cleanTokenData.chain,
             })
             
             await prisma.token.create({
-              data: tokenData,
+              data: cleanTokenData,
             })
             imported++
-            console.log(`✓ Imported token: ${tokenData.name} (${tokenData.symbol})`)
+            console.log(`✓ Imported token: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
           } catch (createError: any) {
             // Log full error for debugging
-            console.error(`Error creating token ${mint}:`, {
+            console.error(`✗ Error creating token ${mint}:`, {
               error: createError.message,
               code: createError.code,
               meta: createError.meta,
-              data: tokenData,
+              attemptedData: cleanTokenData,
             })
             
             // Handle unique constraint errors
             if (createError.code === 'P2002') {
               // Slug still conflicts, try with full mint
-              tokenData.slug = `token-${mint.substring(0, 16)}`
+              cleanTokenData.slug = `token-${mint.substring(0, 16)}`
               try {
                 await prisma.token.create({
-                  data: tokenData,
+                  data: cleanTokenData,
                 })
                 imported++
-                console.log(`✓ Imported token with unique slug: ${tokenData.name} (${tokenData.symbol})`)
+                console.log(`✓ Imported token with unique slug: ${cleanTokenData.name} (${cleanTokenData.symbol})`)
               } catch (retryError: any) {
-                errorDetails.push(`Failed to create ${tokenData.name}: ${retryError.message}`)
+                errorDetails.push(`Failed to create ${cleanTokenData.name}: ${retryError.message}`)
                 errors++
               }
             } else {
-              // Other validation errors
-              errorDetails.push(`Failed to create ${tokenData.name}: ${createError.message}`)
+              // Other validation errors - show full error message
+              const errorMsg = createError.message || 'Unknown error'
+              errorDetails.push(`Failed to create ${cleanTokenData.name}: ${errorMsg}`)
               errors++
             }
           }
