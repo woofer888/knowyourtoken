@@ -169,11 +169,11 @@ export async function GET(request: NextRequest) {
         
         // CRITICAL: Double-check that this token is newer than our last one
         // This prevents importing old tokens even if they passed the initial filter
-        // Use same buffer (2 seconds) as the initial filter
+        // Use same buffer (30 seconds) as the initial filter
         if (lastMigrated?.migrationDate) {
           const lastDate = lastMigrated.migrationDate.getTime() / 1000
           const thisDate = migrationDate.getTime() / 1000
-          const bufferTime = 2
+          const bufferTime = 30
           if (thisDate <= (lastDate - bufferTime)) {
             const timeDiff = lastDate - thisDate
             console.log(`Skipping ${mint.substring(0, 8)}... - migration date ${migrationDate.toISOString()} (${thisDate}) is ${timeDiff.toFixed(1)}s before last migrated ${lastMigrated.migrationDate.toISOString()} (${lastDate})`)
