@@ -172,13 +172,10 @@ export async function GET(request: NextRequest) {
         // CRITICAL: Verify this token actually migrated from PumpFun
         // The graduated endpoint should only return tokens that migrated, but let's double-check
         // by verifying the token has a creationTime from PumpFun (tokens launched directly on Jupiter won't have this)
-        // Also check if the token has completion status from PumpFun bonding curve
-        const hasPumpFunOrigin = 
-          token.creationTime && token.creationTime > 0 && // Has creation time from PumpFun
-          ((token as any).complete === true || (token as any).curveComplete === true) // Completed PumpFun bonding curve
-        
-        if (!hasPumpFunOrigin) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - token does not appear to have migrated from PumpFun (missing creationTime or completion status)`)
+        // The "graduated" endpoint should only return tokens that actually migrated, so if it's in this list,
+        // it should be valid. But we'll verify it has creationTime as a basic check.
+        if (!token.creationTime || token.creationTime <= 0) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - token missing creationTime from PumpFun (may have launched directly on Jupiter)`)
           continue
         }
         
