@@ -28,11 +28,12 @@ export default async function HomePage() {
   let errorMessage: string | null = null
   
   try {
-    // Fetch trending tokens
+    // Fetch trending tokens (exclude migrated tokens - they have their own section)
     trendingTokens = await executeQuery(() =>
       prisma.token.findMany({
         where: {
           published: true,
+          migrated: false, // Exclude migrated tokens from trending
         },
         orderBy: {
           marketCap: "desc",
