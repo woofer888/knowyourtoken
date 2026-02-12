@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 import Link from "next/link"
+import { executeQuery } from "@/lib/db-query"
 
 export const dynamic = 'force-dynamic'
 
@@ -25,26 +26,28 @@ export default async function HomePage() {
   let errorMessage: string | null = null
   
   try {
-    trendingTokens = await prisma.token.findMany({
-      where: {
-        published: true,
-      },
-      orderBy: {
-        marketCap: "desc",
-      },
-      take: 6,
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        symbol: true,
-        description: true,
-        chain: true,
-        logoUrl: true,
-        marketCap: true,
-        sentiment: true,
-      },
-    })
+    trendingTokens = await executeQuery(() =>
+      prisma.token.findMany({
+        where: {
+          published: true,
+        },
+        orderBy: {
+          marketCap: "desc",
+        },
+        take: 6,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          symbol: true,
+          description: true,
+          chain: true,
+          logoUrl: true,
+          marketCap: true,
+          sentiment: true,
+        },
+      })
+    )
     console.log(`Found ${trendingTokens.length} tokens`)
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : String(error)

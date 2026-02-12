@@ -3,6 +3,7 @@ import { TokenCard } from "@/components/token-card"
 import { Badge } from "@/components/ui/badge"
 import { Prisma } from "@prisma/client"
 import { AutoSyncTrigger } from "@/components/auto-sync-trigger"
+import { executeQuery } from "@/lib/db-query"
 
 export const dynamic = 'force-dynamic'
 
@@ -27,29 +28,31 @@ export default async function MigratedTokensPage() {
   let tokens: TokenWithMarketData[] = []
 
   try {
-    tokens = await prisma.token.findMany({
-      where: {
-        published: true,
-        migrated: true,
-      },
-      orderBy: {
-        migrationDate: "desc",
-      },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        symbol: true,
-        description: true,
-        chain: true,
-        logoUrl: true,
-        marketCap: true,
-        sentiment: true,
-        migrated: true,
-        migrationDate: true,
-        migrationDex: true,
-      },
-    })
+    tokens = await executeQuery(() =>
+      prisma.token.findMany({
+        where: {
+          published: true,
+          migrated: true,
+        },
+        orderBy: {
+          migrationDate: "desc",
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          symbol: true,
+          description: true,
+          chain: true,
+          logoUrl: true,
+          marketCap: true,
+          sentiment: true,
+          migrated: true,
+          migrationDate: true,
+          migrationDex: true,
+        },
+      })
+    )
   } catch (error) {
     console.error('Database error:', error)
     tokens = []

@@ -4,23 +4,26 @@ import { Button } from "@/components/ui/button"
 import { SyncMigratedButton } from "@/components/sync-migrated-button"
 import Link from "next/link"
 import { Plus } from "lucide-react"
+import { executeQuery } from "@/lib/db-query"
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const tokens = await prisma.token.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      _count: {
-        select: {
-          events: true,
-          gallery: true,
+  const tokens = await executeQuery(() =>
+    prisma.token.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        _count: {
+          select: {
+            events: true,
+            gallery: true,
+          },
         },
       },
-    },
-  })
+    })
+  )
 
   return (
     <div className="container py-8 md:py-12">

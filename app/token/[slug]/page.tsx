@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { executeQuery } from "@/lib/db-query"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -59,28 +60,30 @@ export default async function TokenPage({ params }: PageProps) {
     }
   }>
   
-  let token: TokenWithRelations | null = null
-  
-  try {
-    token = await prisma.token.findUnique({
-      where: { slug },
-      include: {
-        events: {
-          orderBy: {
-            date: "desc",
-          },
-        },
-        gallery: {
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-      },
-    })
-  } catch (error) {
-    console.error('Database error:', error)
-    notFound()
-  }
+      let token: TokenWithRelations | null = null
+
+      try {
+        token = await executeQuery(() =>
+          prisma.token.findUnique({
+            where: { slug },
+            include: {
+              events: {
+                orderBy: {
+                  date: "desc",
+                },
+              },
+              gallery: {
+                orderBy: {
+                  createdAt: "desc",
+                },
+              },
+            },
+          })
+        )
+      } catch (error) {
+        console.error('Database error:', error)
+        notFound()
+      }
 
   if (!token || !token.published) {
     notFound()
