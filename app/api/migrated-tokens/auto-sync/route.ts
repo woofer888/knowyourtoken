@@ -65,8 +65,8 @@ export async function GET(request: NextRequest) {
     
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
-      // Use a larger buffer (30 seconds) to account for API timing differences and delays
-      const bufferTime = 30
+      // Use a larger buffer (60 seconds) to account for API timing differences and delays
+      const bufferTime = 60
       tokensToProcess = sortedTokens.filter((token) => {
         // Try multiple fields - check for migration time, graduated time, or creation time
         const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
