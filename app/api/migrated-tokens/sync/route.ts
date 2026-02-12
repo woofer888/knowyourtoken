@@ -180,13 +180,6 @@ export async function POST(request: NextRequest) {
             (metadata as any).complete === true ||
             (metadata as any).curveComplete === true
           
-          // Fifth check: Verify the mint address from metadata matches
-          const metadataMint = metadata.mint || (metadata as any).mint || (metadata as any).coinMint
-          if (metadataMint && metadataMint !== mint) {
-            console.log(`Skipping ${mint.substring(0, 8)}... - metadata mint mismatch`)
-            continue
-          }
-          
           // If no completion status, check if it's a very recent token
           const tokenAge = Date.now() / 1000 - token.creationTime
           const isRecent = tokenAge < 3600 // Less than 1 hour old
