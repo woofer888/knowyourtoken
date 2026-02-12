@@ -47,20 +47,30 @@ export async function POST(request: NextRequest) {
       return timeB - timeA // Descending order (newest first)
     })
 
-    // Filter to only NEW tokens (migrated after our last one)
-    let tokensToProcess = sortedTokens
+    // Filter to only NEW tokens that migrated very recently
+    // Only import tokens that migrated in the last 1 hour to avoid importing old historical tokens
+    const oneHourAgo = Math.floor((Date.now() - 60 * 60 * 1000) / 1000) // 1 hour ago in seconds
+    
+    let tokensToProcess = sortedTokens.filter((token) => {
+      const tokenTime = token.creationTime || (token as any).createdAt || 0
+      // Only include tokens that migrated in the last hour
+      return tokenTime > oneHourAgo
+    })
+
+    // Also check if we have a last migration date - only import tokens newer than that
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
-      tokensToProcess = sortedTokens.filter((token) => {
-        const tokenTime = token.creationTime || (token as any).createdAt
+      tokensToProcess = tokensToProcess.filter((token) => {
+        const tokenTime = token.creationTime || (token as any).createdAt || 0
         return tokenTime > lastDate
       })
       console.log(`Filtered to ${tokensToProcess.length} new tokens (after ${new Date(lastDate * 1000).toISOString()})`)
     } else {
-      // If no previous migrations, only take the last 3 to avoid importing everything
-      tokensToProcess = sortedTokens.slice(0, 3)
-      console.log(`No previous migrations found, importing only last 3 tokens`)
+      console.log(`No previous migrations found, importing tokens from last hour only`)
     }
+    
+    // Limit to 20 max per sync
+    tokensToProcess = tokensToProcess.slice(0, 20)
 
     let imported = 0
     let updated = 0
