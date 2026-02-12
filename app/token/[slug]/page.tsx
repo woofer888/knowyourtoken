@@ -24,9 +24,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params
   
   try {
-    const token = await prisma.token.findUnique({
-      where: { slug },
-    })
+    const token = await executeQuery(() =>
+      prisma.token.findUnique({
+        where: { slug },
+      })
+    )
 
     if (!token || !token.published) {
       return {
