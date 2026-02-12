@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 import Link from "next/link"
 import { executeQuery } from "@/lib/db-query"
+import { AutoSyncTrigger } from "@/components/auto-sync-trigger"
 
 export const dynamic = 'force-dynamic'
 
@@ -88,6 +89,7 @@ export default async function HomePage() {
 
   return (
     <div className="container py-8 md:py-12">
+      <AutoSyncTrigger />
       {/* Hero Section */}
       <div className="flex flex-col items-center justify-center space-y-6 py-12 md:py-24">
         <h1 className="text-4xl font-bold tracking-tight sm:text-6xl md:text-7xl text-center">
