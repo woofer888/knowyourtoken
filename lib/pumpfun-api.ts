@@ -137,19 +137,28 @@ export function convertPumpFunTokenToDbFormat(
   const telegram = token.telegram || (token as any).telegramUrl || null
   const website = token.website || (token as any).websiteUrl || null
   
-  // Extract creation time
+  // Extract creation time - handle different formats
   let creationTime = token.creationTime || (token as any).createdAt || (token as any).created_at
   if (typeof creationTime === 'string') {
     creationTime = new Date(creationTime).getTime() / 1000
+  } else if (creationTime && typeof creationTime === 'number' && creationTime < 10000000000) {
+    // If it's already in seconds (Unix timestamp), use as-is
+  } else if (creationTime && typeof creationTime === 'number' && creationTime > 10000000000) {
+    // If it's in milliseconds, convert to seconds
+    creationTime = creationTime / 1000
   }
   
+  // Generate slug from name, or fallback to mint-based slug
+  const slugBase = name || `token-${mint.substring(0, 8)}`
+  const slug = slugBase
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || `token-${mint.substring(0, 8)}`
+  
   return {
-    name: name,
-    symbol: symbol,
-    slug: name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || `token-${mint.substring(0, 8)}`,
+    name: name || `Token ${mint.substring(0, 8)}`,
+    symbol: symbol || "UNKNOWN",
+    slug: slug,
     contractAddress: mint,
     chain: "Solana",
     description: description,
