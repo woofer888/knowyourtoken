@@ -12,6 +12,14 @@ export const revalidate = 60 // Revalidate at most once per minute
  */
 export async function GET(request: NextRequest) {
   try {
+    // First, check if we have ANY migrated tokens at all
+    const migratedCount = await prisma.token.count({
+      where: {
+        migrated: true,
+        isPumpFun: true,
+      },
+    })
+    
     // Get the most recent migration date from our database
     const lastMigrated = await prisma.token.findFirst({
       where: {
@@ -71,30 +79,16 @@ export async function GET(request: NextRequest) {
         console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()}`)
       }
     } else {
-      // If no previous migrations, only import tokens that migrated VERY recently (last 1 minute)
-      // This prevents importing old historical tokens while allowing truly new ones to be imported
-      const oneMinuteAgo = Math.floor((Date.now() - 1 * 60 * 1000) / 1000) // 1 minute ago in seconds
-      
-      tokensToProcess = sortedTokens.filter((token) => {
-        const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
-        // Only import tokens that migrated in the last 1 minute
-        return tokenTime > oneMinuteAgo
+      // If no previous migrations, DO NOT import anything automatically
+      // User must manually use "Sync All Migrated" to establish a baseline
+      // This prevents importing old tokens on every refresh
+      console.log(`No previous migrations found (count: ${migratedCount}) - skipping auto-import to prevent old tokens. Use 'Sync All Migrated' button to manually import a baseline.`)
+      return NextResponse.json({
+        message: "No previous migrations found. Use 'Sync All Migrated' button in admin dashboard to manually import a baseline. After that, new migrations will be imported automatically.",
+        imported: 0,
+        checked: graduatedTokens.length,
+        new: 0,
       })
-      
-      if (tokensToProcess.length === 0) {
-        console.log("No previous migrations found and no tokens migrated in the last 1 minute")
-        return NextResponse.json({
-          message: "No previous migrations found. Only tokens migrated in the last 1 minute will be imported. Use 'Sync All Migrated' to manually import a baseline.",
-          imported: 0,
-          checked: graduatedTokens.length,
-          new: 0,
-        })
-      }
-      
-      // Limit to 1 most recent token when establishing baseline (to prevent importing multiple old tokens)
-      tokensToProcess = tokensToProcess.slice(0, 1)
-      const firstTokenTime = (tokensToProcess[0] as any).migrationTime || (tokensToProcess[0] as any).graduatedAt || tokensToProcess[0].creationTime || (tokensToProcess[0] as any).createdAt || 0
-      console.log(`No previous migrations found - importing 1 most recent token (migrated in last 1 minute) to establish baseline. Migration time: ${new Date(firstTokenTime * 1000).toISOString()}`)
     }
 
     // Limit to 20 max per sync to avoid timeout
