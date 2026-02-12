@@ -147,50 +147,23 @@ export async function POST(request: NextRequest) {
           continue
         }
         
-        // CRITICAL: Verify token has actually graduated/migrated
-        // Check completion status - tokens that graduated should have this
-        const hasCompletionStatus = 
-          (token as any).complete === true || 
-          (token as any).curveComplete === true
+        // IMPORTANT: If token is in /coins/graduated endpoint, it IS migrated
+        // No need to check completion status - being in graduated list is proof
+        console.log(`Processing token ${mint.substring(0, 8)}... from graduated list (migrated)`)
         
-        // If no completion status, check if it's very recent (might still be migrating)
-        // But if it's old and has no completion status, it's likely not graduated
-        const tokenAge = Date.now() / 1000 - token.creationTime
-        const isRecent = tokenAge < 3600 // Less than 1 hour old
-        
-        // Log the token's status for debugging
-        console.log(`Checking token ${mint.substring(0, 8)}... - complete: ${(token as any).complete}, curveComplete: ${(token as any).curveComplete}, age: ${Math.floor(tokenAge / 3600)}h`)
-        
-        // Require completion status OR be very recent
-        // This filters out old tokens that haven't graduated (like moonshot)
-        if (!hasCompletionStatus && !isRecent) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status and is not recent (age: ${Math.floor(tokenAge / 3600)}h) - likely not graduated/migrated`)
-          continue
-        }
-        
-        if (!hasCompletionStatus && isRecent) {
-          console.log(`Warning: ${mint.substring(0, 8)}... - no completion status but very recent (${Math.floor(tokenAge / 60)}min old), allowing`)
-        }
-        
-        // Second check: Try to fetch metadata from PumpFun API
-        // If the token doesn't exist on PumpFun, it never migrated from there
+        // Fetch metadata from PumpFun API to get full token details
         let metadata = null
         try {
           metadata = await fetchTokenMetadata(mint)
           if (!metadata) {
-            console.log(`Skipping ${mint.substring(0, 8)}... - token not found in PumpFun API (may have launched directly on Jupiter)`)
+            console.log(`Warning: ${mint.substring(0, 8)}... - metadata not found, but continuing since it's in graduated list`)
+            // Don't skip - token is in graduated list, so it's migrated
+            // But if we need metadata for name/symbol, we'll have an issue
             if (needsMetadata) {
-              errorDetails.push(`Token ${mint} not found in PumpFun API - may not have migrated`)
+              errorDetails.push(`Token ${mint} metadata not found but in graduated list`)
               errors++
+              continue
             }
-            continue
-          }
-          
-          // Third check: Verify the token actually exists and has valid PumpFun data
-          const metadataMint = metadata.mint || (metadata as any).mint || (metadata as any).coinMint
-          if (metadataMint && metadataMint !== mint) {
-            console.log(`Skipping ${mint.substring(0, 8)}... - metadata mint mismatch`)
-            continue
           }
         } catch (err) {
           console.warn(`Error fetching metadata for ${mint}:`, err)
