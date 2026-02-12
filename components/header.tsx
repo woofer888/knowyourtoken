@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function Header() {
   return (
@@ -31,6 +32,7 @@ export function Header() {
             <Link href="/admin">
               <Button variant="ghost" size="sm">Admin</Button>
             </Link>
+            <ThemeToggle />
           </nav>
         </div>
       </div>
