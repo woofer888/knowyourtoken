@@ -8,3 +8,11 @@
 [build.environment]
   NODE_VERSION = "18"
 
+# Scheduled function to auto-sync migrated tokens every minute
+[[functions]]
+  directory = "netlify/functions"
+
+# Configure the scheduled function
+[functions.auto-sync-migrated]
+  schedule = "*/1 * * * *"  # Every minute (cron format)
+

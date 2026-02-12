@@ -36,18 +36,25 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Sort by creationTime descending to get newest first
+    const sortedTokens = [...graduatedTokens].sort((a, b) => {
+      const timeA = a.creationTime || (a as any).createdAt || 0
+      const timeB = b.creationTime || (b as any).createdAt || 0
+      return timeB - timeA // Descending order (newest first)
+    })
+
     // Filter to only new tokens (if we have a last migration date)
-    let tokensToProcess = graduatedTokens
+    let tokensToProcess = sortedTokens
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
-      tokensToProcess = graduatedTokens.filter((token) => {
+      tokensToProcess = sortedTokens.filter((token) => {
         const tokenTime = token.creationTime || (token as any).createdAt
         return tokenTime > lastDate
       })
     }
 
-    // Limit to 10 new tokens per sync to avoid timeout
-    tokensToProcess = tokensToProcess.slice(0, 10)
+    // Only sync the last 3 migrated tokens (most recent)
+    tokensToProcess = tokensToProcess.slice(0, 3)
 
     if (tokensToProcess.length === 0) {
       return NextResponse.json({
