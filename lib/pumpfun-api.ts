@@ -198,6 +198,24 @@ export function convertPumpFunTokenToDbFormat(
     throw new Error("Contract address (mint) is required")
   }
   
+  // Convert creationTime (in seconds) to Date object
+  let migrationDate: Date
+  if (creationTime && creationTime > 0) {
+    // creationTime is already in seconds, convert to milliseconds for Date constructor
+    const timestampMs = creationTime * 1000
+    migrationDate = new Date(timestampMs)
+    
+    // Validate the date is reasonable (not in the future by more than 1 year)
+    const now = Date.now()
+    const oneYearFromNow = now + (365 * 24 * 60 * 60 * 1000)
+    if (timestampMs > oneYearFromNow) {
+      console.warn(`Invalid migration date: ${migrationDate.toISOString()} (timestamp: ${creationTime}). Using current time instead.`)
+      migrationDate = new Date()
+    }
+  } else {
+    migrationDate = new Date()
+  }
+  
   return {
     name: finalName,
     symbol: finalSymbol,
@@ -211,7 +229,7 @@ export function convertPumpFunTokenToDbFormat(
     websiteUrl: website ? (website.startsWith('http') ? website : `https://${website}`) : null,
     isPumpFun: true,
     migrated: true,
-    migrationDate: creationTime ? new Date(creationTime * 1000) : new Date(),
+    migrationDate: migrationDate,
     migrationDex: migrationDex,
     published: true, // Auto-publish migrated tokens
   }
