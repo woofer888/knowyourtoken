@@ -61,18 +61,24 @@ export async function GET(request: NextRequest) {
     
     if (lastMigrated?.migrationDate) {
       const lastDate = lastMigrated.migrationDate.getTime() / 1000
-      // Use a very small buffer (2 seconds) to account for API timing differences
-      // But still prevent importing old tokens
-      const bufferTime = 2
+      // Use a larger buffer (30 seconds) to account for API timing differences and delays
+      const bufferTime = 30
       tokensToProcess = sortedTokens.filter((token) => {
         // Try multiple fields - check for migration time, graduated time, or creation time
         const tokenTime = (token as any).migrationTime || (token as any).graduatedAt || token.creationTime || (token as any).createdAt || 0
-        // Only import tokens that migrated AFTER our last one (with small buffer for timing)
+        const mint = token.mint || (token as any).coinMint || 'unknown'
+        
+        // Check for specific tokens the user mentioned
+        if (mint.includes('BHnSeK64YVpSyYVxz5GnPVTR2w3bZ1y5vdMPMN1Rpump') || mint.includes('ARkgcXQqVy5Vi1qaKF44piXaV8bUB2vb1phDPDjXpump')) {
+          console.log(`🔍 Found user's token ${mint.substring(0, 8)}... - time: ${new Date(tokenTime * 1000).toISOString()} (${tokenTime}), last: ${new Date(lastDate * 1000).toISOString()} (${lastDate}), diff: ${(tokenTime - lastDate).toFixed(1)}s`)
+        }
+        
+        // Only import tokens that migrated AFTER our last one (with buffer for timing)
         const isNewer = tokenTime > (lastDate - bufferTime)
-        if (!isNewer && sortedTokens.indexOf(token) < 3) {
-          // Log first 3 skipped tokens for debugging
+        if (!isNewer && sortedTokens.indexOf(token) < 10) {
+          // Log first 10 skipped tokens for debugging
           const timeDiff = lastDate - tokenTime
-          console.log(`Skipping token - migration time ${new Date(tokenTime * 1000).toISOString()} (${tokenTime}) is ${timeDiff.toFixed(1)}s before last ${new Date(lastDate * 1000).toISOString()} (${lastDate})`)
+          console.log(`Skipping token ${mint.substring(0, 8)}... - migration time ${new Date(tokenTime * 1000).toISOString()} (${tokenTime}) is ${timeDiff.toFixed(1)}s before last ${new Date(lastDate * 1000).toISOString()} (${lastDate})`)
         }
         return isNewer
       })
@@ -80,8 +86,9 @@ export async function GET(request: NextRequest) {
       console.log(`Last migrated token in DB: ${lastMigrated.migrationDate.toISOString()} (timestamp: ${lastDate})`)
       if (sortedTokens.length > 0) {
         const firstTokenTime = (sortedTokens[0] as any).migrationTime || (sortedTokens[0] as any).graduatedAt || sortedTokens[0].creationTime || (sortedTokens[0] as any).createdAt || 0
+        const firstMint = sortedTokens[0].mint || (sortedTokens[0] as any).coinMint || 'unknown'
         const timeDiff = firstTokenTime - lastDate
-        console.log(`Newest token from API: ${new Date(firstTokenTime * 1000).toISOString()} (timestamp: ${firstTokenTime}) - ${timeDiff > 0 ? `${timeDiff.toFixed(1)}s newer` : `${Math.abs(timeDiff).toFixed(1)}s older`} than last`)
+        console.log(`Newest token from API: ${firstMint.substring(0, 8)}... at ${new Date(firstTokenTime * 1000).toISOString()} (timestamp: ${firstTokenTime}) - ${timeDiff > 0 ? `${timeDiff.toFixed(1)}s newer` : `${Math.abs(timeDiff).toFixed(1)}s older`} than last`)
       }
     } else {
       // If no previous migrations, DO NOT import anything automatically
