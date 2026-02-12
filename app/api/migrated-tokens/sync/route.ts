@@ -133,34 +133,48 @@ export async function POST(request: NextRequest) {
         const needsMetadata = !tokenName || !tokenSymbol
 
         // CRITICAL: Verify this token actually migrated from PumpFun
-        // The graduated endpoint should only return tokens that migrated, but let's double-check
-        // by verifying the token has a creationTime from PumpFun (tokens launched directly on Jupiter won't have this)
-        // The "graduated" endpoint should only return tokens that actually migrated, so if it's in this list,
-        // it should be valid. But we'll verify it has creationTime as a basic check.
+        // First check: token must have creationTime from PumpFun
         if (!token.creationTime || token.creationTime <= 0) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - token missing creationTime from PumpFun (may have launched directly on Jupiter)`)
+          console.log(`Skipping ${mint.substring(0, 8)}... - token missing creationTime from PumpFun`)
           continue
         }
         
-        // Fetch detailed metadata (required if we don't have name/symbol)
+        // Second check: Try to fetch metadata from PumpFun API
+        // If the token doesn't exist on PumpFun, it never migrated from there
         let metadata = null
         try {
           metadata = await fetchTokenMetadata(mint)
           if (!metadata) {
-            console.warn(`Could not fetch metadata for ${mint}`)
+            console.log(`Skipping ${mint.substring(0, 8)}... - token not found in PumpFun API (may have launched directly on Jupiter)`)
             if (needsMetadata) {
-              errorDetails.push(`Token ${mint} missing name/symbol and metadata fetch failed`)
+              errorDetails.push(`Token ${mint} not found in PumpFun API - may not have migrated`)
               errors++
-              continue
             }
+            continue
+          }
+          
+          // Third check: Verify the metadata indicates it's from PumpFun
+          const hasPumpFunMetadata = 
+            metadata.mint === mint || // Metadata matches
+            (metadata as any).mint === mint ||
+            metadata.name || // Has name from PumpFun
+            metadata.symbol // Has symbol from PumpFun
+          
+          if (!hasPumpFunMetadata) {
+            console.log(`Skipping ${mint.substring(0, 8)}... - metadata doesn't indicate PumpFun origin`)
+            continue
           }
         } catch (err) {
           console.warn(`Error fetching metadata for ${mint}:`, err)
+          // If we can't fetch metadata and we need it, skip
           if (needsMetadata) {
-            errorDetails.push(`Token ${mint} missing name/symbol and metadata fetch error`)
+            errorDetails.push(`Token ${mint} metadata fetch error - may not have migrated`)
             errors++
             continue
           }
+          // If we don't need metadata, still skip to be safe
+          console.log(`Skipping ${mint.substring(0, 8)}... - error fetching metadata from PumpFun`)
+          continue
         }
         
         // Use metadata if available (it has more complete data), otherwise use token data

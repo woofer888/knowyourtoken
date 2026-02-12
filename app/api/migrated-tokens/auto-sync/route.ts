@@ -166,16 +166,32 @@ export async function GET(request: NextRequest) {
           }
         }
         
-        // Fetch metadata
+        // CRITICAL: Verify this token actually migrated from PumpFun
+        // First check: token must have creationTime from PumpFun
+        if (!token.creationTime || token.creationTime <= 0) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - token missing creationTime from PumpFun`)
+          continue
+        }
+        
+        // Second check: Try to fetch metadata from PumpFun API
+        // If the token doesn't exist on PumpFun, it never migrated from there
         const metadata = await fetchTokenMetadata(mint)
         
-        // CRITICAL: Verify this token actually migrated from PumpFun
-        // The graduated endpoint should only return tokens that migrated, but let's double-check
-        // by verifying the token has a creationTime from PumpFun (tokens launched directly on Jupiter won't have this)
-        // The "graduated" endpoint should only return tokens that actually migrated, so if it's in this list,
-        // it should be valid. But we'll verify it has creationTime as a basic check.
-        if (!token.creationTime || token.creationTime <= 0) {
-          console.log(`Skipping ${mint.substring(0, 8)}... - token missing creationTime from PumpFun (may have launched directly on Jupiter)`)
+        if (!metadata) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - token not found in PumpFun API (may have launched directly on Jupiter)`)
+          continue
+        }
+        
+        // Third check: Verify the metadata indicates it's from PumpFun
+        // Tokens that migrated from PumpFun should have metadata with PumpFun-related fields
+        const hasPumpFunMetadata = 
+          metadata.mint === mint || // Metadata matches
+          (metadata as any).mint === mint ||
+          metadata.name || // Has name from PumpFun
+          metadata.symbol // Has symbol from PumpFun
+        
+        if (!hasPumpFunMetadata) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - metadata doesn't indicate PumpFun origin`)
           continue
         }
         
