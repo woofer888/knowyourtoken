@@ -1,8 +1,8 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { formatCurrency } from "@/lib/utils"
 import { TokenImage } from "@/components/token-image"
+import { TokenCardLiveData } from "@/components/token-card-live-data"
 
 interface TokenCardProps {
   token: {
@@ -46,9 +46,10 @@ export function TokenCard({ token }: TokenCardProps) {
             {token.description || "No description available."}
           </p>
           <div className="flex justify-between items-center text-sm mt-auto">
-            <span className="text-muted-foreground">
-              Market Cap: <span className="font-medium">{formatCurrency(token.marketCap)}</span>
-            </span>
+            <TokenCardLiveData
+              symbol={token.symbol}
+              fallbackMarketCap={token.marketCap}
+            />
             {token.sentiment && (
               <Badge
                 variant={
