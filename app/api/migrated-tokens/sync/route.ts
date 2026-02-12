@@ -123,6 +123,19 @@ export async function POST(request: NextRequest) {
           errors++
           continue
         }
+        
+        // CRITICAL: Verify the mint address looks like a PumpFun token
+        // PumpFun tokens typically have "pump" in the address or specific patterns
+        const isPumpFunAddress = 
+          mint.toLowerCase().includes('pump') || // Has "pump" in address
+          mint.length === 44 // Standard Solana address length
+        
+        if (!isPumpFunAddress) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - address doesn't match PumpFun pattern`)
+          continue
+        }
+        
+        console.log(`Processing token: ${mint.substring(0, 8)}... (full: ${mint})`)
 
         // Try to get name and symbol from the token object directly
         // The graduated tokens endpoint might not have name/symbol, so we'll fetch metadata
@@ -167,13 +180,28 @@ export async function POST(request: NextRequest) {
             (metadata as any).complete === true ||
             (metadata as any).curveComplete === true
           
+          // Fifth check: Verify the mint address from metadata matches
+          const metadataMint = metadata.mint || (metadata as any).mint || (metadata as any).coinMint
+          if (metadataMint && metadataMint !== mint) {
+            console.log(`Skipping ${mint.substring(0, 8)}... - metadata mint mismatch`)
+            continue
+          }
+          
           // If no completion status, check if it's a very recent token
           const tokenAge = Date.now() / 1000 - token.creationTime
           const isRecent = tokenAge < 3600 // Less than 1 hour old
           
-          if (!hasCompletionStatus && !isRecent) {
-            console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status and is not recent (age: ${Math.floor(tokenAge / 3600)}h) - may not have migrated from PumpFun`)
-            continue
+          // For tokens without completion status, require they be very recent AND have "pump" in address
+          if (!hasCompletionStatus) {
+            if (!isRecent) {
+              console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status and is not recent (age: ${Math.floor(tokenAge / 3600)}h) - may not have migrated from PumpFun`)
+              continue
+            }
+            // Even if recent, if it doesn't have "pump" in address, be suspicious
+            if (!mint.toLowerCase().includes('pump')) {
+              console.log(`Skipping ${mint.substring(0, 8)}... - recent token without completion status and no "pump" in address - may not be from PumpFun`)
+              continue
+            }
           }
         } catch (err) {
           console.warn(`Error fetching metadata for ${mint}:`, err)

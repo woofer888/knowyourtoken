@@ -123,6 +123,18 @@ export async function GET(request: NextRequest) {
           continue
         }
 
+        // CRITICAL: Verify the mint address looks like a PumpFun token
+        // PumpFun tokens typically have "pump" in the address or specific patterns
+        // Tokens that launched directly on Jupiter won't have this
+        const isPumpFunAddress = 
+          mint.toLowerCase().includes('pump') || // Has "pump" in address
+          mint.length === 44 // Standard Solana address length (PumpFun tokens are Solana)
+        
+        if (!isPumpFunAddress) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - address doesn't match PumpFun pattern`)
+          continue
+        }
+
         // Check if already exists by contract address (prevent duplicates)
         const existing = await executeQuery(() =>
           prisma.token.findFirst({
@@ -138,6 +150,9 @@ export async function GET(request: NextRequest) {
           skippedExisting++
           continue // Skip if already exists - prevent duplicates
         }
+        
+        // Log which token we're processing
+        console.log(`Processing token: ${mint.substring(0, 8)}... (full: ${mint})`)
 
         // Get the actual migration time from the token BEFORE fetching metadata
         // This is critical - we need to use the time from the graduated tokens list, not metadata
