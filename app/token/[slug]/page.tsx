@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatCurrency, formatPrice } from "@/lib/utils"
 import { ExternalLink, Twitter, MessageCircle, Globe } from "lucide-react"
 import { TokenImage } from "@/components/token-image"
+import { LiveMarketData } from "@/components/live-market-data"
 import type { Metadata } from "next"
 import { Prisma } from "@prisma/client"
 
@@ -188,29 +189,23 @@ export default async function TokenPage({ params }: PageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Market Data</CardTitle>
-                <CardDescription>Current market information</CardDescription>
+                <CardDescription>Live market information</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Current Price</span>
-                  <span className="text-sm font-medium">{formatPrice(token.currentPrice)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Market Cap</span>
-                  <span className="text-sm font-medium">{formatCurrency(token.marketCap)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">24h Volume</span>
-                  <span className="text-sm font-medium">{formatCurrency(token.volume24h)}</span>
-                </div>
+                <LiveMarketData
+                  symbol={token.symbol}
+                  fallbackPrice={token.currentPrice}
+                  fallbackMarketCap={token.marketCap}
+                  fallbackVolume={token.volume24h}
+                />
                 {token.launchPrice && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center pt-2 border-t">
                     <span className="text-sm text-muted-foreground">Launch Price</span>
                     <span className="text-sm font-medium">{formatPrice(token.launchPrice)}</span>
                   </div>
                 )}
                 {token.sentiment && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center pt-2 border-t">
                     <span className="text-sm text-muted-foreground">Community Sentiment</span>
                     <Badge
                       variant={
