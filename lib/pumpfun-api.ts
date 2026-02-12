@@ -149,15 +149,34 @@ export function convertPumpFunTokenToDbFormat(
   }
   
   // Generate slug from name, or fallback to mint-based slug
-  const slugBase = name || `token-${mint.substring(0, 8)}`
-  const slug = slugBase
+  // Ensure slug is never empty
+  let slugBase = name || `token-${mint.substring(0, 8)}`
+  if (!slugBase || slugBase.trim() === "") {
+    slugBase = `token-${mint.substring(0, 8)}`
+  }
+  
+  let slug = slugBase
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "") || `token-${mint.substring(0, 8)}`
+    .replace(/(^-|-$)/g, "")
+  
+  // Ensure slug is never empty - use mint as fallback
+  if (!slug || slug.trim() === "") {
+    slug = `token-${mint.substring(0, 16)}`
+  }
+  
+  // Ensure name and symbol are never empty
+  const finalName = name || `Token ${mint.substring(0, 8)}`
+  const finalSymbol = symbol || "UNKNOWN"
+  
+  // Ensure contractAddress is never empty
+  if (!mint || mint.trim() === "") {
+    throw new Error("Contract address (mint) is required")
+  }
   
   return {
-    name: name || `Token ${mint.substring(0, 8)}`,
-    symbol: symbol || "UNKNOWN",
+    name: finalName,
+    symbol: finalSymbol,
     slug: slug,
     contractAddress: mint,
     chain: "Solana",

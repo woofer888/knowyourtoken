@@ -83,17 +83,18 @@ export async function POST(request: NextRequest) {
         tokenData.contractAddress = mint
         
         // Validate required fields
-        if (!tokenData.name || !tokenData.symbol || !tokenData.contractAddress) {
+        if (!tokenData.name || !tokenData.symbol || !tokenData.contractAddress || !tokenData.slug) {
           const missing = []
           if (!tokenData.name) missing.push("name")
           if (!tokenData.symbol) missing.push("symbol")
           if (!tokenData.contractAddress) missing.push("contractAddress")
+          if (!tokenData.slug) missing.push("slug")
           errorDetails.push(`Token ${mint} missing required fields: ${missing.join(", ")}`)
           errors++
           continue
         }
 
-        // Check if token already exists
+        // Check if token already exists by contract address
         const existing = await prisma.token.findFirst({
           where: {
             contractAddress: mint,
@@ -122,12 +123,37 @@ export async function POST(request: NextRequest) {
           updated++
           console.log(`Updated token: ${tokenData.name} (${tokenData.symbol})`)
         } else {
-          // Create new token
-          await prisma.token.create({
-            data: tokenData,
+          // Check if slug already exists (might be a different token with same name)
+          const slugExists = await prisma.token.findUnique({
+            where: { slug: tokenData.slug },
           })
-          imported++
-          console.log(`Imported token: ${tokenData.name} (${tokenData.symbol})`)
+          
+          if (slugExists) {
+            // Generate unique slug by appending mint suffix
+            tokenData.slug = `${tokenData.slug}-${mint.substring(0, 8)}`
+          }
+          
+          // Create new token
+          try {
+            await prisma.token.create({
+              data: tokenData,
+            })
+            imported++
+            console.log(`Imported token: ${tokenData.name} (${tokenData.symbol})`)
+          } catch (createError: any) {
+            // Handle unique constraint errors
+            if (createError.code === 'P2002') {
+              // Slug still conflicts, try with full mint
+              tokenData.slug = `token-${mint.substring(0, 16)}`
+              await prisma.token.create({
+                data: tokenData,
+              })
+              imported++
+              console.log(`Imported token with unique slug: ${tokenData.name} (${tokenData.symbol})`)
+            } else {
+              throw createError
+            }
+          }
         }
 
         // Small delay to avoid rate limiting
