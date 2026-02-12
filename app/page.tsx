@@ -22,6 +22,7 @@ export default async function HomePage() {
   }
   
   let trendingTokens: TokenCard[] = []
+  let errorMessage: string | null = null
   
   try {
     trendingTokens = await prisma.token.findMany({
@@ -44,7 +45,9 @@ export default async function HomePage() {
         sentiment: true,
       },
     })
+    console.log(`Found ${trendingTokens.length} tokens`)
   } catch (error) {
+    errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Database error:', error)
     // Return empty array if database connection fails
     trendingTokens = []
@@ -93,6 +96,9 @@ export default async function HomePage() {
         ) : (
           <div className="text-center py-12 text-muted-foreground">
             <p>No tokens found. Add some tokens in the admin panel!</p>
+            {errorMessage && (
+              <p className="text-xs text-red-500 mt-2">Error: {errorMessage}</p>
+            )}
           </div>
         )}
       </section>
