@@ -22,12 +22,12 @@ export function SyncMigratedButton() {
       if (response.ok) {
         setResult({
           success: true,
-          message: `Sync completed: ${data.imported} imported, ${data.updated} updated`,
+          message: `Sync completed: ${data.imported} imported, ${data.updated} updated${data.errors > 0 ? `, ${data.errors} errors` : ''}`,
         })
       } else {
         setResult({
           success: false,
-          message: data.error || "Failed to sync tokens",
+          message: data.error || data.details || "Failed to sync tokens",
         })
       }
     } catch (error) {
