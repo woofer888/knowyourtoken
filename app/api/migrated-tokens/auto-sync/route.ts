@@ -168,6 +168,20 @@ export async function GET(request: NextRequest) {
         
         // Fetch metadata
         const metadata = await fetchTokenMetadata(mint)
+        
+        // CRITICAL: Verify this token actually migrated from PumpFun
+        // The graduated endpoint should only return tokens that migrated, but let's double-check
+        // by verifying the token has a creationTime from PumpFun (tokens launched directly on Jupiter won't have this)
+        // Also check if the token has completion status from PumpFun bonding curve
+        const hasPumpFunOrigin = 
+          token.creationTime && token.creationTime > 0 && // Has creation time from PumpFun
+          ((token as any).complete === true || (token as any).curveComplete === true) // Completed PumpFun bonding curve
+        
+        if (!hasPumpFunOrigin) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - token does not appear to have migrated from PumpFun (missing creationTime or completion status)`)
+          continue
+        }
+        
         const tokenData = convertPumpFunTokenToDbFormat(
           metadata || token,
           "PumpSwap"
