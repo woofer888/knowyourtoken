@@ -29,6 +29,9 @@ export function Header() {
             <Link href="/tokens">
               <Button variant="ghost">Browse</Button>
             </Link>
+            <Link href="/migrated">
+              <Button variant="ghost">Migrated</Button>
+            </Link>
             <Link href="/admin">
               <Button variant="ghost" size="sm">Admin</Button>
             </Link>

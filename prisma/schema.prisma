@@ -41,6 +41,12 @@ model Token {
   // Media
   logoUrl         String?
   
+  // PumpFun migration tracking
+  isPumpFun       Boolean  @default(false)
+  migrated        Boolean  @default(false)
+  migrationDate   DateTime?
+  migrationDex    String?  // PumpSwap, Raydium, etc.
+  
   // Metadata
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

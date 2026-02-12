@@ -33,6 +33,10 @@ export default function EditTokenPage({ params }: { params: { id: string } }) {
     volume24h: "",
     sentiment: "",
     published: false,
+    isPumpFun: false,
+    migrated: false,
+    migrationDate: "",
+    migrationDex: "",
   })
 
   useEffect(() => {
@@ -61,6 +65,10 @@ export default function EditTokenPage({ params }: { params: { id: string } }) {
             volume24h: token.volume24h?.toString() || "",
             sentiment: token.sentiment || "",
             published: token.published || false,
+            isPumpFun: token.isPumpFun || false,
+            migrated: token.migrated || false,
+            migrationDate: token.migrationDate ? new Date(token.migrationDate).toISOString().split("T")[0] : "",
+            migrationDex: token.migrationDex || "",
           })
         }
       } catch (error) {
@@ -89,6 +97,10 @@ export default function EditTokenPage({ params }: { params: { id: string } }) {
           currentPrice: formData.currentPrice ? parseFloat(formData.currentPrice) : null,
           marketCap: formData.marketCap ? parseFloat(formData.marketCap) : null,
           volume24h: formData.volume24h ? parseFloat(formData.volume24h) : null,
+          isPumpFun: formData.isPumpFun,
+          migrated: formData.migrated,
+          migrationDate: formData.migrationDate ? new Date(formData.migrationDate) : null,
+          migrationDex: formData.migrationDex || null,
         }),
       })
 
@@ -361,16 +373,74 @@ export default function EditTokenPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="published"
-                name="published"
-                checked={formData.published}
-                onChange={handleChange}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <Label htmlFor="published">Published</Label>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="published"
+                  name="published"
+                  checked={formData.published}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="published">Published</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isPumpFun"
+                  name="isPumpFun"
+                  checked={formData.isPumpFun}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="isPumpFun">PumpFun Token</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="migrated"
+                  name="migrated"
+                  checked={formData.migrated}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="migrated">Migrated</Label>
+              </div>
+              
+              {formData.migrated && (
+                <div className="space-y-4 pl-6 border-l-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="migrationDate">Migration Date</Label>
+                    <Input
+                      id="migrationDate"
+                      name="migrationDate"
+                      type="date"
+                      value={formData.migrationDate}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="migrationDex">Migration DEX</Label>
+                    <select
+                      id="migrationDex"
+                      name="migrationDex"
+                      value={formData.migrationDex}
+                      onChange={handleChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="">Select DEX</option>
+                      <option value="PumpSwap">PumpSwap</option>
+                      <option value="Raydium">Raydium</option>
+                      <option value="Jupiter">Jupiter</option>
+                      <option value="Orca">Orca</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end space-x-4">

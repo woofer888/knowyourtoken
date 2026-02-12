@@ -53,6 +53,10 @@ export async function PATCH(
       volume24h,
       sentiment,
       published,
+      isPumpFun,
+      migrated,
+      migrationDate,
+      migrationDex,
     } = body
 
     // Check if token exists
@@ -104,6 +108,10 @@ export async function PATCH(
         volume24h: volume24h || null,
         sentiment: sentiment || null,
         published: published || false,
+        isPumpFun: isPumpFun || false,
+        migrated: migrated || false,
+        migrationDate: migrationDate ? new Date(migrationDate) : null,
+        migrationDex: migrationDex || null,
       },
     })
 
