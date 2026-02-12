@@ -147,19 +147,29 @@ export async function POST(request: NextRequest) {
           continue
         }
         
-        // Note: Since this token is in the "graduated" endpoint, it should be graduated by definition
-        // But let's check completion status as an additional verification
+        // CRITICAL: Verify token has actually graduated/migrated
+        // Check completion status - tokens that graduated should have this
         const hasCompletionStatus = 
           (token as any).complete === true || 
           (token as any).curveComplete === true
         
-        // Log the token's status for debugging
-        console.log(`Checking token ${mint.substring(0, 8)}... - complete: ${(token as any).complete}, curveComplete: ${(token as any).curveComplete}`)
+        // If no completion status, check if it's very recent (might still be migrating)
+        // But if it's old and has no completion status, it's likely not graduated
+        const tokenAge = Date.now() / 1000 - token.creationTime
+        const isRecent = tokenAge < 3600 // Less than 1 hour old
         
-        // If no completion status, still allow it since it's in the graduated list
-        // But log a warning
-        if (!hasCompletionStatus) {
-          console.log(`Warning: ${mint.substring(0, 8)}... - no completion status, but allowing since it's in graduated list`)
+        // Log the token's status for debugging
+        console.log(`Checking token ${mint.substring(0, 8)}... - complete: ${(token as any).complete}, curveComplete: ${(token as any).curveComplete}, age: ${Math.floor(tokenAge / 3600)}h`)
+        
+        // Require completion status OR be very recent
+        // This filters out old tokens that haven't graduated (like moonshot)
+        if (!hasCompletionStatus && !isRecent) {
+          console.log(`Skipping ${mint.substring(0, 8)}... - token has no completion status and is not recent (age: ${Math.floor(tokenAge / 3600)}h) - likely not graduated/migrated`)
+          continue
+        }
+        
+        if (!hasCompletionStatus && isRecent) {
+          console.log(`Warning: ${mint.substring(0, 8)}... - no completion status but very recent (${Math.floor(tokenAge / 60)}min old), allowing`)
         }
         
         // Second check: Try to fetch metadata from PumpFun API
